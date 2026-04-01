@@ -1,31 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Montana Conservation District Map</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Page Header -->
+<h2>Montana Conservation Districts Map</h2>
+<p>Click a district or marker for details.</p>
 
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<!-- Map container -->
+<div id="map" style="height:600px; width:100%; margin-bottom:30px;"></div>
+
+<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
-<style>
-  body { margin: 0; font-family: 'Open Sans', sans-serif; }
-  #map { height: 100vh; width: 100%; }
-  .popup { display: flex; gap: 10px; max-width: 260px; font-size: 13px; line-height: 1.4; }
-  .popup-left { flex: 0 0 70px; }
-  .popup-left img { width: 70px; height: auto; border-radius: 4px; object-fit: contain; }
-  .popup-right { flex: 1; }
-  .popup-right h3 { margin: 0 0 4px; font-size: 15px; color: #1f4e79; }
-  .popup a { color: #1f4e79; text-decoration: none; }
-  .popup a:hover { text-decoration: underline; }
-</style>
-</head>
-
-<body>
-<div id="map"></div>
-
+<!-- Leaflet JS & PapaParse -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+
+<style>
+.popup { display: flex; gap: 10px; max-width: 260px; font-size: 13px; line-height: 1.4; }
+.popup-left { flex: 0 0 70px; }
+.popup-left img { width: 70px; height: auto; border-radius: 4px; object-fit: contain; }
+.popup-right { flex: 1; }
+.popup-right h3 { margin: 0 0 4px; font-size: 15px; color: #1f4e79; }
+.popup a { color: #1f4e79; text-decoration: none; }
+.popup a:hover { text-decoration: underline; }
+</style>
 
 <script>
 const map = L.map('map').setView([46.8, -110.0], 6);
@@ -35,12 +30,12 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-// Data URLs
-const districtsUrl = "./data/district-boundaries_simplified-disable.geojson";
-const backgroundUrl = "./data/MT_background.geojson";
+// URLs (raw GitHub + Google Sheets CSV)
+const districtsUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/district-boundaries_simplified-disable.geojson";
+const backgroundUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/MT_background.geojson";
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
-// Load GeoJSON and CSV
+// Load all data
 Promise.all([
   fetch(districtsUrl).then(r => r.json()),
   fetch(backgroundUrl).then(r => r.json()),
@@ -48,29 +43,36 @@ Promise.all([
 ]).then(([districts, background, csvText]) => {
 
   const csv = Papa.parse(csvText, { header: true, skipEmptyLines: true }).data;
-  console.log("CSV rows:", csv);
 
-  // Build a lookup for CSV rows by district name
+  // Build lookup from CSV: normalize names
   const lookup = {};
   csv.forEach(row => {
     if (row.name) {
-      lookup[row.name.trim().toLowerCase()] = row;
+      const key = row.name.trim().toLowerCase().replace(/\s+/g, ' ');
+      lookup[key] = row;
     }
   });
 
-  // Background layer
+  // Background polygons
   L.geoJSON(background, {
     style: { color: "#cccccc", weight: 1, fillColor: "#eeeeee", fillOpacity: 1 }
   }).addTo(map);
 
-  // Polygon layer (visual only, hover effect)
-  const districtLayer = L.geoJSON(districts, {
-    style: { color: "#ffffff", weight: 1, fillColor: "#2c6da4", fillOpacity: 0.6 },
+  // District polygons
+  const polygonLayer = L.geoJSON(districts, {
+    style: { color: "#1f4e79", weight: 2, fillColor: "#2c6da4", fillOpacity: 0.5 },
     onEachFeature: (feature, layer) => {
-      const name = (feature.properties.MACD_NAME ?? "").trim().toLowerCase();
+      // Normalize GeoJSON name
+      const name = (feature.properties.MACD_NAME ?? "").trim().toLowerCase().replace(/\s+/g, ' ');
       const row = lookup[name];
 
-      // Optional: make polygons clickable to show CSV popup if available
+      // Hover effect
+      layer.on({
+        mouseover: e => e.target.setStyle({ fillOpacity: 0.8 }),
+        mouseout: e => e.target.setStyle({ fillOpacity: 0.5 })
+      });
+
+      // Click popup at polygon center
       if (row && feature.geometry) {
         const popupContent = `
           <div class="popup">
@@ -88,22 +90,15 @@ Promise.all([
             </div>
           </div>
         `;
-
         layer.on('click', () => {
           const center = layer.getBounds().getCenter();
           L.popup().setLatLng(center).setContent(popupContent).openOn(map);
         });
       }
-
-      // Hover effect
-      layer.on({
-        mouseover: e => e.target.setStyle({ fillOpacity: 0.85 }),
-        mouseout: e => e.target.setStyle({ fillOpacity: 0.6 })
-      });
     }
   }).addTo(map);
 
-  // Place markers from CSV for precise popup locations
+  // Markers at CSV Lat/Long
   const markerLatLngs = [];
   csv.forEach(row => {
     if (!row["Lat,Long"]) return;
@@ -133,10 +128,8 @@ Promise.all([
     markerLatLngs.push(latlng);
   });
 
-  // Fit map to all markers
-  if (markerLatLngs.length > 0) map.fitBounds(markerLatLngs);
+  // Fit map to all polygons for complete view
+  map.fitBounds(polygonLayer.getBounds());
 
 }).catch(err => console.error("Load error:", err));
 </script>
-</body>
-</html>

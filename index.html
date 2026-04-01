@@ -5,12 +5,36 @@
   <title>Montana Conservation District Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
   <style>
-    body { margin: 0; }
+    body { margin: 0; font-family: Arial, sans-serif; }
     #map { height: 100vh; }
+
+    .popup {
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .popup h3 {
+      margin: 0 0 5px;
+      font-size: 16px;
+    }
+
+    .popup img {
+      max-width: 120px;
+      margin-bottom: 5px;
+    }
+
+    .popup a {
+      color: #2a7ae2;
+      text-decoration: none;
+    }
+
+    .popup a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 
@@ -18,10 +42,7 @@
 
 <div id="map"></div>
 
-<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<!-- PapaParse -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <script>
@@ -33,24 +54,47 @@
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  // ✅ YOUR GOOGLE SHEET (fixed CSV link)
+  // ✅ Google Sheet CSV
   const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
   Papa.parse(csvUrl, {
     download: true,
     header: true,
     complete: function(results) {
-      console.log(results.data);
 
       results.data.forEach(row => {
-        if (row.Latitude && row.Longitude) {
-          L.marker([
-            parseFloat(row.Latitude),
-            parseFloat(row.Longitude)
-          ])
-          .addTo(map)
-          .bindPopup(`<b>${row.Name || "District"}</b>`);
+
+        if (row["Lat,Long"]) {
+          const coords = row["Lat,Long"].split(",");
+
+          const lat = parseFloat(coords[0]);
+          const lon = parseFloat(coords[1]);
+
+          if (!isNaN(lat) && !isNaN(lon)) {
+
+            // ✅ CLEAN POPUP DESIGN
+            const popupContent = `
+              <div class="popup">
+                ${row.cd_logo ? `<img src="${row.cd_logo}" alt="Logo">` : ""}
+                <h3>${row.name || "District"}</h3>
+
+                ${row["physical_address"] ? `<div>${row["physical_address"]}</div>` : ""}
+
+                ${row.Phone ? `<div><strong>Phone:</strong> ${row.Phone}</div>` : ""}
+                ${row.Email ? `<div><strong>Email:</strong> ${row.Email}</div>` : ""}
+                ${row.Hours ? `<div><strong>Hours:</strong> ${row.Hours}</div>` : ""}
+
+                ${row.Website ? `<div><a href="${row.Website}" target="_blank">Visit Website</a></div>` : ""}
+                ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social Media</a></div>` : ""}
+              </div>
+            `;
+
+            L.marker([lat, lon])
+              .addTo(map)
+              .bindPopup(popupContent);
+          }
         }
+
       });
     },
     error: function(err) {

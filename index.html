@@ -61,7 +61,6 @@
 </head>
 
 <body>
-
 <div id="map"></div>
 
 <!-- Leaflet JS -->
@@ -78,7 +77,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-// Data files (adjust if you use a /data folder)
+// Data files
 const districtsUrl = "./data/district-boundaries_simplified-disable.geojson";
 const backgroundUrl = "./data/MT_background.geojson";
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
@@ -119,12 +118,11 @@ Promise.all([
       fillOpacity: 0.6
     },
     onEachFeature: function(feature, layer) {
-
       const key = feature.properties.MACD_NAME?.trim().toLowerCase();
       const row = lookup[key];
 
       if (row) {
-        const popup = `
+        const popupContent = `
           <div class="popup">
             <div class="popup-left">
               <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
@@ -140,9 +138,17 @@ Promise.all([
             </div>
           </div>
         `;
-        layer.bindPopup(popup);
+
+        // Open popup at polygon center on click
+        layer.on('click', e => {
+          L.popup()
+            .setLatLng(layer.getBounds().getCenter())
+            .setContent(popupContent)
+            .openOn(map);
+        });
       }
 
+      // Hover effect
       layer.on({
         mouseover: e => e.target.setStyle({ fillOpacity: 0.85 }),
         mouseout: e => e.target.setStyle({ fillOpacity: 0.6 })
@@ -157,6 +163,5 @@ Promise.all([
   console.error("Load error:", err);
 });
 </script>
-
 </body>
 </html>

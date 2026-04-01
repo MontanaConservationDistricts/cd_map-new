@@ -63,51 +63,55 @@
             })
             .catch(e => console.error('Districts error:', e));
 
-        // Load CSV - SKIP THE BROKEN "area" COLUMN
+        // Load CSV - MANUAL COLUMN MAPPING
         fetch(csvUrl)
             .then(r => r.text())
             .then(csv => {
-                // Remove the problematic "area" column header and its data
-                // The area column appears to have quotes and newlines breaking the CSV
-                const lines = csv.split('\n');
-                const header = lines[0];
-                
-                // Remove the "area" column (appears to be between cd_logo and physical_address)
-                // Split by comma but be careful with quoted fields
-                const cleanedHeader = header
-                    .replace(/"area\s*"/g, '') // Remove the quoted "area" with possible newline
-                    .replace(/,,/g, ',');       // Remove double commas left behind
-                
-                // Rebuild CSV with cleaned header
-                const cleanedCsv = [cleanedHeader, ...lines.slice(1)].join('\n');
-                
-                console.log('Original header:', header);
-                console.log('Cleaned header:', cleanedHeader);
-                
-                Papa.parse(cleanedCsv, {
-                    header: true,
+                Papa.parse(csv, {
+                    header: false,  // Parse as arrays, not objects
                     skipEmptyLines: true,
                     complete: (results) => {
-                        const data = results.data || [];
-                        console.log(`Loaded ${data.length} rows from CSV`);
-                        
-                        // Log column names to verify
-                        if (data.length > 0) {
-                            console.log('Columns:', Object.keys(data[0]));
-                            console.log('First row:', data[0]);
-                        }
+                        const rows = results.data || [];
+                        console.log(`Loaded ${rows.length} rows`);
 
-                        data.forEach((row, idx) => {
+                        // Expected column order (skipping the broken "area" column):
+                        // 0: name
+                        // 1: cd_logo
+                        // 2: area (SKIP - this is broken)
+                        // 3: physical_address
+                        // 4: city
+                        // 5: state
+                        // 6: zip
+                        // 7: Lat,Long
+                        // 8: Hours
+                        // 9: Phone
+                        // 10: Email
+                        // 11: Website
+                        // 12: social_media
+
+                        rows.forEach((row, idx) => {
                             try {
-                                // Get coordinates
-                                let latlng = row['Lat,Long'] || row['lat,long'];
-                                if (!latlng) {
-                                    console.warn(`Row ${idx}: No Lat,Long found`);
-                                    return;
-                                }
+                                if (idx === 0) return; // Skip header
+
+                                // Extract by column index
+                                const name = (row[0] || '').trim();
+                                const logo = (row[1] || '').trim();
+                                // SKIP row[2] - broken area column
+                                const address = (row[3] || '').trim();
+                                const city = (row[4] || '').trim();
+                                const state = (row[5] || '').trim();
+                                const zip = (row[6] || '').trim();
+                                const latlng = (row[7] || '').trim();
+                                const hours = (row[8] || '').trim();
+                                const phone = (row[9] || '').trim();
+                                const email = (row[10] || '').trim();
+                                const website = (row[11] || '').trim();
+                                const social = (row[12] || '').trim();
+
+                                if (!latlng || !name) return;
 
                                 // Parse coordinates
-                                const parts = latlng.trim().split(',').map(s => parseFloat(s.trim()));
+                                const parts = latlng.split(',').map(s => parseFloat(s.trim()));
                                 if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
                                     console.warn(`Row ${idx}: Invalid coords: ${latlng}`);
                                     return;
@@ -120,19 +124,6 @@
                                     console.warn(`Row ${idx}: Out of bounds: ${lat}, ${lng}`);
                                     return;
                                 }
-
-                                // Get fields (case-insensitive)
-                                const name = (row.name || row.Name || '').trim() || 'District';
-                                const logo = (row.cd_logo || row.cd_logo || '').trim();
-                                const address = (row.physical_address || row.Physical_address || '').trim();
-                                const city = (row.city || row.City || '').trim();
-                                const state = (row.state || row.State || '').trim();
-                                const zip = (row.zip || row.Zip || '').trim();
-                                const hours = (row.Hours || row.hours || '').trim();
-                                const phone = (row.Phone || row.phone || '').trim();
-                                const email = (row.Email || row.email || '').trim();
-                                const website = (row.Website || row.website || '').trim();
-                                const social = (row.social_media || row.Social_media || '').trim();
 
                                 // Build full address
                                 let fullAddress = address;
@@ -153,8 +144,8 @@
                                 if (phone) html += `<div><b>Phone:</b> <a href="tel:${phone}">${phone}</a></div>`;
                                 if (email) html += `<div><b>Email:</b> <a href="mailto:${email}">${email}</a></div>`;
                                 if (hours) html += `<div><b>Hours:</b><br>${hours}</div>`;
-                                if (website) html += `<div><a href="${website}" target="_blank" rel="noopener">🌐 Website</a></div>`;
-                                if (social) html += `<div><a href="${social}" target="_blank" rel="noopener">📱 Social Media</a></div>`;
+                                if (website) html += `<div><a href="${website}" target="_blank" rel="noopener">Website</a></div>`;
+                                if (social) html += `<div><a href="${social}" target="_blank" rel="noopener">Social Media</a></div>`;
                                 
                                 html += '</div>';
 
@@ -162,8 +153,8 @@
                                 L.marker([lat, lng]).bindPopup(html).addTo(map);
                                 bounds.push([lat, lng]);
 
-                                if (idx === 0) {
-                                    console.log(`✓ First marker: ${name} at [${lat}, ${lng}]`);
+                                if (idx === 1) {
+                                    console.log(`First marker: ${name} at [${lat}, ${lng}]`);
                                 }
 
                             } catch (e) {
@@ -174,17 +165,12 @@
                         // Fit map to all markers
                         if (bounds.length > 0) {
                             map.fitBounds(bounds, { padding: [50, 50] });
-                            console.log(`✓ Successfully added ${bounds.length} markers`);
-                        } else {
-                            console.warn('❌ No markers added');
+                            console.log(`SUCCESS: Added ${bounds.length} markers`);
                         }
-                    },
-                    error: (err) => {
-                        console.error('Papa Parse error:', err);
                     }
                 });
             })
-            .catch(e => console.error('CSV fetch error:', e));
+            .catch(e => console.error('CSV error:', e));
     </script>
 </body>
 </html>

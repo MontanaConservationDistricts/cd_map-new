@@ -12,14 +12,46 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { width: 100%; height: 100%; font-family: 'Open Sans', sans-serif; }
         #map { width: 100%; height: 100%; }
-        .debug { position: fixed; top: 10px; left: 10px; background: white; padding: 12px; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; font-size: 10px; max-width: 420px; max-height: 700px; overflow-y: auto; font-family: monospace; border: 2px solid #1f4e79; line-height: 1.2; word-break: break-all; }
-        .popup-content { font-family: 'Open Sans', sans-serif; font-size: 13px; line-height: 1.6; }
-        .popup-content img { width: 70px; height: auto; border-radius: 3px; margin-bottom: 8px; display: block; }
-        .popup-content h3 { margin: 0 0 8px 0; color: #1f4e79; font-size: 15px; font-weight: 600; }
-        .popup-content div { margin: 5px 0; }
-        .popup-content b { color: #333; font-weight: 600; }
-        .popup-content a { color: #1f4e79; text-decoration: none; font-weight: 500; }
-        .popup-content a:hover { text-decoration: underline; }
+
+        /* Debug panel */
+        .debug { 
+            position: fixed; top: 10px; left: 10px; background: white; 
+            padding: 12px; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); 
+            z-index: 1000; font-size: 10px; max-width: 420px; max-height: 700px; 
+            overflow-y: auto; font-family: monospace; border: 2px solid #1f4e79; line-height: 1.2; word-break: break-all; 
+        }
+
+        /* Clean popup styling */
+        .popup-content {
+            font-family: 'Open Sans', sans-serif;
+            font-size: 13px;
+            line-height: 1.5;
+            max-width: 260px;
+        }
+        .popup-content img {
+            width: 70px;
+            height: auto;
+            border-radius: 4px;
+            display: block;
+            margin-bottom: 8px;
+            object-fit: contain;
+        }
+        .popup-content h3 {
+            margin: 0 0 4px 0;
+            font-size: 15px;
+            color: #1f4e79;
+            font-weight: 600;
+        }
+        .popup-content div {
+            margin-bottom: 4px;
+        }
+        .popup-content a {
+            color: #1f4e79;
+            text-decoration: none;
+        }
+        .popup-content a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -29,13 +61,11 @@
     <script>
         const DEBUG = document.getElementById('debug');
         const logs = [];
-
         function log(msg) {
             logs.push(msg);
             DEBUG.innerHTML = logs.slice(-60).map(m => '<div>' + m + '</div>').join('');
             DEBUG.scrollTop = DEBUG.scrollHeight;
         }
-
         log('=== DEBUGGING MAP ===');
 
         const map = L.map('map').setView([46.8797, -110.3625], 6);
@@ -78,33 +108,8 @@
                     complete: (results) => {
                         const data = results.data || [];
                         log('Total rows: ' + data.length);
-                        log('');
-
-                        if (data.length > 0) {
-                            const keys = Object.keys(data[0]);
-                            log('COLUMN NAMES (' + keys.length + '):');
-                            for (let i = 0; i < keys.length; i++) {
-                                log('  [' + i + '] "' + keys[i] + '"');
-                            }
-                            log('');
-                            log('=== FIRST 3 ROWS ===');
-                            log('');
-
-                            for (let i = 0; i < Math.min(3, data.length); i++) {
-                                log('ROW ' + i + ':');
-                                for (let j = 0; j < keys.length; j++) {
-                                    const val = (data[i][keys[j]] || '').substring(0, 30);
-                                    log('  ' + keys[j] + ': "' + val + '"');
-                                }
-                                log('');
-                            }
-                        }
-
-                        log('=== PROCESSING ===');
-                        log('');
 
                         let markerCount = 0;
-
                         data.forEach((row, idx) => {
                             try {
                                 const latlng = (row['Lat,Long'] || '').trim();
@@ -128,32 +133,28 @@
                                 const website = (row.Website || '').trim();
                                 const social = (row.social_media || '').trim();
 
-                                if (idx < 3) {
-                                    log('ROW ' + idx + ' DATA:');
-                                    log('  name: ' + name);
-                                    log('  lat,lng: ' + lat + ',' + lng);
-                                    log('  address: ' + address);
-                                    log('  city: ' + city);
-                                    log('');
-                                }
-
                                 let fullAddr = address;
                                 if (city) fullAddr += (fullAddr ? ', ' : '') + city;
                                 if (state) fullAddr += (fullAddr ? ', ' : '') + state;
                                 if (zip) fullAddr += (fullAddr ? ' ' : '') + zip;
 
-                             let html = '<div class="popup-content">';
-if (logo) html += '<img src="' + logo + '" onerror="this.style.display=\'none\'">';
-html += '<h3>' + name + '</h3>';
-if (fullAddr) html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
-if (phone) html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
-if (email) html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
-if (hours) html += '<div><b>Hours:</b><br>' + hours + '</div>';
-if (website) html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
-if (social) html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
-html += '</div>';
+                                // Clean popup HTML
+                                let html = '<div class="popup-content">';
+                                if (logo) html += '<img src="' + logo + '" onerror="this.style.display=\'none\'">';
+                                html += '<h3>' + name + '</h3>';
+                                if (fullAddr) html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
+                                if (phone) html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
+                                if (email) html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
+                                if (hours) html += '<div><b>Hours:</b><br>' + hours + '</div>';
+                                if (website) html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
+                                if (social) html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
+                                html += '</div>';
 
-                                L.marker([lat, lng]).bindPopup(html).addTo(map);
+                                // Bind popup to marker
+                                L.marker([lat, lng])
+                                    .bindPopup(html)
+                                    .addTo(map);
+
                                 bounds.push([lat, lng]);
                                 markerCount++;
 
@@ -162,13 +163,8 @@ html += '</div>';
                             }
                         });
 
-                        log('');
-                        log('=== COMPLETE ===');
                         log('Total markers added: ' + markerCount);
-
-                        if (bounds.length > 0) {
-                            map.fitBounds(bounds, { padding: [50, 50] });
-                        }
+                        if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] });
                     }
                 });
             })

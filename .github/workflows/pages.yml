@@ -5,10 +5,11 @@ on:
     branches:
       - main
 
+# Top-level permissions for deploy-pages v4
 permissions:
   contents: read
   pages: write
-  id-token: write   # required for deploy-pages@v4
+  id-token: write
 
 jobs:
   deploy:
@@ -16,11 +17,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js (optional)
-        uses: actions/setup-node@v3
-        with:
-          node-version: 24   # optional, ensures Node.js 24
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4

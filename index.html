@@ -5,10 +5,7 @@
 <title>Montana Conservation District Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
-
-<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
@@ -24,18 +21,16 @@ body { margin:0; font-family: 'Open Sans', sans-serif; }
 .popup a:hover { text-decoration:underline; }
 </style>
 </head>
-
 <body>
+
 <div id="map"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<!-- PapaParse JS -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <script>
 // Initialize map
-const map = L.map('map').setView([46.8, -110.0], 6);
+const map = L.map('map').setView([46.8, -110], 6);
 
 // Base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -47,41 +42,39 @@ const districtsUrl = "https://raw.githubusercontent.com/montanaconservationdistr
 const backgroundUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/MT_background.geojson";
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
-// Load everything
+// Load all data
 Promise.all([
   fetch(backgroundUrl).then(r=>r.json()),
   fetch(districtsUrl).then(r=>r.json()),
   fetch(csvUrl).then(r=>r.text())
 ]).then(([background, districts, csvText]) => {
 
-  // Parse CSV and clean headers/values
+  // Parse CSV
   const csv = Papa.parse(csvText, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: h => h.trim().replace(/\s+/g,'_'),
-    transform: v => v.trim()
+    header:true,
+    skipEmptyLines:true,
+    transformHeader:h=>h.trim().replace(/\s+/g,'_'),
+    transform:v=>v.trim()
   }).data;
 
-  // Build a lookup by cleaned district name
+  // Build CSV lookup by name
   const lookup = {};
-  csv.forEach(row => {
-    if(row.name) lookup[row.name.toLowerCase()] = row;
-  });
+  csv.forEach(row => { if(row.name) lookup[row.name.toLowerCase()] = row; });
 
   // Background layer
   L.geoJSON(background, {style:{color:"#ccc", fillColor:"#eee", weight:1, fillOpacity:1}}).addTo(map);
 
-  // District polygons layer
+  // District polygons
   const districtLayer = L.geoJSON(districts, {
     style:{color:"#ffffff", fillColor:"#2c6da4", weight:1, fillOpacity:0.6},
     onEachFeature:(feature, layer)=>{
-      // Hover effect
+      // Hover
       layer.on({
         mouseover:e=>e.target.setStyle({fillOpacity:0.85}),
         mouseout:e=>e.target.setStyle({fillOpacity:0.6})
       });
 
-      // Find CSV row by district name
+      // Match CSV row
       const key = feature.properties.MACD_NAME?.trim().toLowerCase();
       const row = lookup[key];
 
@@ -89,7 +82,7 @@ Promise.all([
         const popupContent = `
           <div class="popup">
             <div class="popup-left">
-              <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
+              <img src="${row.cd_logo||'https://via.placeholder.com/70'}">
             </div>
             <div class="popup-right">
               <h3>${row.name}</h3>
@@ -102,8 +95,8 @@ Promise.all([
             </div>
           </div>
         `;
-        // Open popup at polygon center
-        layer.on('click', () => {
+        // Popup at polygon center
+        layer.on('click', ()=> {
           const center = layer.getBounds().getCenter();
           L.popup().setLatLng(center).setContent(popupContent).openOn(map);
         });
@@ -111,7 +104,7 @@ Promise.all([
     }
   }).addTo(map);
 
-  // Place markers using CSV Lat/Long
+  // Add markers at CSV Lat/Long
   const markerLatLngs = [];
   csv.forEach(row=>{
     if(!row.Lat_Long) return;
@@ -121,7 +114,7 @@ Promise.all([
     const popupContent = `
       <div class="popup">
         <div class="popup-left">
-          <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
+          <img src="${row.cd_logo||'https://via.placeholder.com/70'}">
         </div>
         <div class="popup-right">
           <h3>${row.name}</h3>
@@ -134,7 +127,6 @@ Promise.all([
         </div>
       </div>
     `;
-
     L.marker(latlng).addTo(map).bindPopup(popupContent);
     markerLatLngs.push(latlng);
   });

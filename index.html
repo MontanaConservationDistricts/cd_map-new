@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Montana Conservation District Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+  <style>
+    body { margin: 0; }
+    #map { height: 100vh; }
+  </style>
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- PapaParse -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+
+<script>
+  // Initialize map
+  const map = L.map('map').setView([46.8, -110.0], 6);
+
+  // Basemap
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  // ✅ YOUR GOOGLE SHEET (fixed CSV link)
+  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
+
+  Papa.parse(csvUrl, {
+    download: true,
+    header: true,
+    complete: function(results) {
+      console.log(results.data);
+
+      results.data.forEach(row => {
+        if (row.Latitude && row.Longitude) {
+          L.marker([
+            parseFloat(row.Latitude),
+            parseFloat(row.Longitude)
+          ])
+          .addTo(map)
+          .bindPopup(`<b>${row.Name || "District"}</b>`);
+        }
+      });
+    },
+    error: function(err) {
+      console.error("CSV failed:", err);
+    }
+  });
+</script>
+
+</body>
+</html>

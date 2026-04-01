@@ -1,134 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Montana Conservation District Map</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>Montana Conservation District Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Open Sans', sans-serif;
-    }
-
-    #map {
-      height: 100vh;
-      width: 100%;
-    }
-
-    /* Popup styling */
-    .popup {
-      display: flex;
-      gap: 10px;
-      max-width: 260px;
-      font-size: 13px;
-      line-height: 1.4;
-    }
-    .popup-left {
-      flex: 0 0 70px;
-    }
-    .popup-left img {
-      width: 70px;
-      height: auto;
-      border-radius: 4px;
-      object-fit: contain;
-    }
-    .popup-right {
-      flex: 1;
-    }
-    .popup-right h3 {
-      margin: 0 0 4px;
-      font-size: 15px;
-      color: #1f4e79;
-    }
-    .popup-right div {
-      margin-bottom: 2px;
-    }
-    .popup a {
-      color: #1f4e79;
-      text-decoration: none;
-    }
-    .popup a:hover {
-      text-decoration: underline;
-    }
-  </style>
+<style>
+  body { margin: 0; font-family: 'Open Sans', sans-serif; }
+  #map { height: 100vh; width: 100%; }
+  .popup { display: flex; gap: 10px; max-width: 260px; font-size: 13px; line-height: 1.4; }
+  .popup-left { flex: 0 0 70px; }
+  .popup-left img { width: 70px; height: auto; border-radius: 4px; object-fit: contain; }
+  .popup-right { flex: 1; }
+  .popup-right h3 { margin: 0 0 4px; font-size: 15px; color: #1f4e79; }
+  .popup a { color: #1f4e79; text-decoration: none; }
+  .popup a:hover { text-decoration: underline; }
+</style>
 </head>
 
 <body>
 <div id="map"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<!-- PapaParse JS -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <script>
 const map = L.map('map').setView([46.8, -110.0], 6);
 
-// Base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-// Data files
 const districtsUrl = "./data/district-boundaries_simplified-disable.geojson";
 const backgroundUrl = "./data/MT_background.geojson";
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
-// Load everything
 Promise.all([
   fetch(districtsUrl).then(r => r.json()),
   fetch(backgroundUrl).then(r => r.json()),
   fetch(csvUrl).then(r => r.text())
 ]).then(([districts, background, csvText]) => {
 
-  const csv = Papa.parse(csvText, { header: true }).data;
+  const csv = Papa.parse(csvText, { header: true, skipEmptyLines: true }).data;
+  console.log("CSV parsed rows:", csv);
 
-  // Build lookup by MACD_NAME
+  // Build lookup by lowercase name
   const lookup = {};
   csv.forEach(row => {
-    if (row.MACD_NAME) {
-      lookup[row.MACD_NAME.trim().toLowerCase()] = row;
+    if (row.name) {
+      const key = row.name.trim().toLowerCase();
+      lookup[key] = row;
     }
   });
+  console.log("Lookup keys:", Object.keys(lookup));
 
-  // Background layer
-  L.geoJSON(background, {
-    style: {
-      color: "#cccccc",
-      weight: 1,
-      fillColor: "#eeeeee",
-      fillOpacity: 1
-    }
-  }).addTo(map);
+  // Background
+  L.geoJSON(background, { style: { color: "#cccccc", weight: 1, fillColor: "#eeeeee", fillOpacity: 1 } }).addTo(map);
 
   // Districts layer
   const districtLayer = L.geoJSON(districts, {
-    style: {
-      color: "#ffffff",
-      weight: 1,
-      fillColor: "#2c6da4",
-      fillOpacity: 0.6
-    },
-    onEachFeature: function(feature, layer) {
-      const key = feature.properties.MACD_NAME?.trim().toLowerCase();
+    style: { color: "#ffffff", weight: 1, fillColor: "#2c6da4", fillOpacity: 0.6 },
+    onEachFeature: (feature, layer) => {
+      const name = (feature.properties.MACD_NAME ?? "").trim();
+      const key = name.toLowerCase();
       const row = lookup[key];
 
-      if (row) {
-        const popupContent = `
+      const popupContent = row
+        ? `
           <div class="popup">
             <div class="popup-left">
               <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
             </div>
             <div class="popup-right">
-              <h3>${row.MACD_NAME}</h3>
+              <h3>${row.name}</h3>
               ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
               ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
               ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
@@ -137,18 +84,16 @@ Promise.all([
               ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
             </div>
           </div>
-        `;
+        `
+        : `<strong>${name}</strong><div>No match in CSV</div>`;
 
-        // Open popup at polygon center on click
-        layer.on('click', e => {
-          L.popup()
-            .setLatLng(layer.getBounds().getCenter())
-            .setContent(popupContent)
-            .openOn(map);
-        });
-      }
+      layer.on('click', () => {
+        L.popup()
+          .setLatLng(layer.getBounds().getCenter())
+          .setContent(popupContent)
+          .openOn(map);
+      });
 
-      // Hover effect
       layer.on({
         mouseover: e => e.target.setStyle({ fillOpacity: 0.85 }),
         mouseout: e => e.target.setStyle({ fillOpacity: 0.6 })
@@ -156,12 +101,9 @@ Promise.all([
     }
   }).addTo(map);
 
-  // Fit map to districts
   map.fitBounds(districtLayer.getBounds());
-
-}).catch(err => {
-  console.error("Load error:", err);
-});
+})
+.catch(err => console.error("Load error:", err));
 </script>
 </body>
 </html>

@@ -13,14 +13,6 @@
         html, body { width: 100%; height: 100%; font-family: 'Open Sans', sans-serif; }
         #map { width: 100%; height: 100%; }
 
-        /* Debug panel */
-        .debug { 
-            position: fixed; top: 10px; left: 10px; background: white; 
-            padding: 12px; border-radius: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); 
-            z-index: 1000; font-size: 10px; max-width: 420px; max-height: 700px; 
-            overflow-y: auto; font-family: monospace; border: 2px solid #1f4e79; line-height: 1.2; word-break: break-all; 
-        }
-
         /* Clean popup styling */
         .popup-content {
             font-family: 'Open Sans', sans-serif;
@@ -55,19 +47,9 @@
     </style>
 </head>
 <body>
-    <div id="debug" class="debug"></div>
     <div id="map"></div>
 
     <script>
-        const DEBUG = document.getElementById('debug');
-        const logs = [];
-        function log(msg) {
-            logs.push(msg);
-            DEBUG.innerHTML = logs.slice(-60).map(m => '<div>' + m + '</div>').join('');
-            DEBUG.scrollTop = DEBUG.scrollHeight;
-        }
-        log('=== DEBUGGING MAP ===');
-
         const map = L.map('map').setView([46.8797, -110.3625], 6);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: 'OpenStreetMap',
@@ -80,95 +62,87 @@
 
         let bounds = [];
 
+        // Add background
         fetch(backgroundUrl)
             .then(r => r.json())
             .then(data => L.geoJSON(data, { style: { color: "#ccc", weight: 1, fillColor: "#eee", fillOpacity: 1 } }).addTo(map))
-            .catch(e => log('BG error'));
+            .catch(() => {});
 
+        // Add district boundaries
         fetch(geojsonUrl)
             .then(r => r.json())
             .then(data => {
                 L.geoJSON(data, {
                     style: { color: "#fff", weight: 1, fillColor: "#2c6da4", fillOpacity: 0.6 },
-                    onEachFeature: (f, l) => {
-                        l.on('mouseover', () => l.setStyle({ fillOpacity: 0.85, weight: 2 }).bringToFront());
-                        l.on('mouseout', () => l.setStyle({ fillOpacity: 0.6, weight: 1 }));
+                    onEachFeature: (feature, layer) => {
+                        layer.on('mouseover', () => layer.setStyle({ fillOpacity: 0.85, weight: 2 }).bringToFront());
+                        layer.on('mouseout', () => layer.setStyle({ fillOpacity: 0.6, weight: 1 }));
                     }
                 }).addTo(map);
             })
-            .catch(e => log('GeoJSON error'));
+            .catch(() => {});
 
+        // Add markers from CSV
         fetch(csvUrl)
             .then(r => r.text())
             .then(csv => {
-                log('CSV fetched, length: ' + csv.length);
                 Papa.parse(csv, {
                     header: true,
                     skipEmptyLines: true,
                     complete: (results) => {
                         const data = results.data || [];
-                        log('Total rows: ' + data.length);
+                        data.forEach(row => {
+                            const latlng = (row['Lat,Long'] || '').trim();
+                            if (!latlng) return;
 
-                        let markerCount = 0;
-                        data.forEach((row, idx) => {
-                            try {
-                                const latlng = (row['Lat,Long'] || '').trim();
-                                if (!latlng) return;
+                            const parts = latlng.split(',').map(s => parseFloat(s.trim()));
+                            if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return;
 
-                                const parts = latlng.split(',').map(s => parseFloat(s.trim()));
-                                if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return;
+                            const lat = parts[0];
+                            const lng = parts[1];
 
-                                const lat = parts[0];
-                                const lng = parts[1];
+                            const name = (row.name || '').trim() || 'District';
+                            const logo = (row.cd_logo || '').trim();
+                            const address = (row.physical_address || '').trim();
+                            const city = (row.city || '').trim();
+                            const state = (row.state || '').trim();
+                            const zip = (row.zip || '').trim();
+                            const hours = (row.Hours || '').trim();
+                            const phone = (row.Phone || '').trim();
+                            const email = (row.Email || '').trim();
+                            const website = (row.Website || '').trim();
+                            const social = (row.social_media || '').trim();
 
-                                const name = (row.name || '').trim() || 'District';
-                                const logo = (row.cd_logo || '').trim();
-                                const address = (row.physical_address || '').trim();
-                                const city = (row.city || '').trim();
-                                const state = (row.state || '').trim();
-                                const zip = (row.zip || '').trim();
-                                const hours = (row.Hours || '').trim();
-                                const phone = (row.Phone || '').trim();
-                                const email = (row.Email || '').trim();
-                                const website = (row.Website || '').trim();
-                                const social = (row.social_media || '').trim();
+                            let fullAddr = address;
+                            if (city) fullAddr += (fullAddr ? ', ' : '') + city;
+                            if (state) fullAddr += (fullAddr ? ', ' : '') + state;
+                            if (zip) fullAddr += (fullAddr ? ' ' : '') + zip;
 
-                                let fullAddr = address;
-                                if (city) fullAddr += (fullAddr ? ', ' : '') + city;
-                                if (state) fullAddr += (fullAddr ? ', ' : '') + state;
-                                if (zip) fullAddr += (fullAddr ? ' ' : '') + zip;
+                            // Build clean popup
+                            let html = '<div class="popup-content">';
+                            if (logo) html += '<img src="' + logo + '" onerror="this.style.display=\'none\'">';
+                            html += '<h3>' + name + '</h3>';
+                            if (fullAddr) html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
+                            if (phone) html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
+                            if (email) html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
+                            if (hours) html += '<div><b>Hours:</b><br>' + hours + '</div>';
+                            if (website) html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
+                            if (social) html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
+                            html += '</div>';
 
-                                // Clean popup HTML
-                                let html = '<div class="popup-content">';
-                                if (logo) html += '<img src="' + logo + '" onerror="this.style.display=\'none\'">';
-                                html += '<h3>' + name + '</h3>';
-                                if (fullAddr) html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
-                                if (phone) html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
-                                if (email) html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
-                                if (hours) html += '<div><b>Hours:</b><br>' + hours + '</div>';
-                                if (website) html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
-                                if (social) html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
-                                html += '</div>';
+                            // Add marker and bind popup
+                            L.marker([lat, lng])
+                                .bindPopup(html)
+                                .addTo(map);
 
-                                // Bind popup to marker
-                                L.marker([lat, lng])
-                                    .bindPopup(html)
-                                    .addTo(map);
-
-                                bounds.push([lat, lng]);
-                                markerCount++;
-
-                            } catch (e) {
-                                log('Row ' + idx + ' ERROR: ' + e.message);
-                            }
+                            bounds.push([lat, lng]);
                         });
 
-                        log('Total markers added: ' + markerCount);
                         if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] });
                     }
                 });
             })
-            .catch(e => log('CSV error: ' + e.message));
+            .catch(() => {});
     </script>
 </body>
 </html>

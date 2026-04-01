@@ -36,52 +36,107 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 // Data URLs
+const districtsUrl = "./data/district-boundaries_simplified-disable.geojson";
+const backgroundUrl = "./data/MT_background.geojson";
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
-// Load CSV and add markers
-fetch(csvUrl)
-  .then(r => r.text())
-  .then(csvText => {
-    const csv = Papa.parse(csvText, { header: true, skipEmptyLines: true }).data;
-    console.log("CSV rows:", csv);
+// Load GeoJSON and CSV
+Promise.all([
+  fetch(districtsUrl).then(r => r.json()),
+  fetch(backgroundUrl).then(r => r.json()),
+  fetch(csvUrl).then(r => r.text())
+]).then(([districts, background, csvText]) => {
 
-    const latlngs = [];
+  const csv = Papa.parse(csvText, { header: true, skipEmptyLines: true }).data;
+  console.log("CSV rows:", csv);
 
-    csv.forEach(row => {
-      if (!row["Lat,Long"]) return;
+  // Build a lookup for CSV rows by district name
+  const lookup = {};
+  csv.forEach(row => {
+    if (row.name) {
+      lookup[row.name.trim().toLowerCase()] = row;
+    }
+  });
 
-      const latlng = row["Lat,Long"].split(",").map(Number);
-      if (latlng.length !== 2 || isNaN(latlng[0]) || isNaN(latlng[1])) {
-        console.warn("Invalid Lat,Long:", row["Lat,Long"]);
-        return;
+  // Background layer
+  L.geoJSON(background, {
+    style: { color: "#cccccc", weight: 1, fillColor: "#eeeeee", fillOpacity: 1 }
+  }).addTo(map);
+
+  // Polygon layer (visual only, hover effect)
+  const districtLayer = L.geoJSON(districts, {
+    style: { color: "#ffffff", weight: 1, fillColor: "#2c6da4", fillOpacity: 0.6 },
+    onEachFeature: (feature, layer) => {
+      const name = (feature.properties.MACD_NAME ?? "").trim().toLowerCase();
+      const row = lookup[name];
+
+      // Optional: make polygons clickable to show CSV popup if available
+      if (row && feature.geometry) {
+        const popupContent = `
+          <div class="popup">
+            <div class="popup-left">
+              <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
+            </div>
+            <div class="popup-right">
+              <h3>${row.name}</h3>
+              ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+              ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
+              ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
+              ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
+              ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
+              ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
+            </div>
+          </div>
+        `;
+
+        layer.on('click', () => {
+          const center = layer.getBounds().getCenter();
+          L.popup().setLatLng(center).setContent(popupContent).openOn(map);
+        });
       }
 
-      const popupContent = `
-        <div class="popup">
-          <div class="popup-left">
-            <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
-          </div>
-          <div class="popup-right">
-            <h3>${row.name}</h3>
-            ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
-            ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
-            ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
-            ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
-            ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
-            ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
-          </div>
+      // Hover effect
+      layer.on({
+        mouseover: e => e.target.setStyle({ fillOpacity: 0.85 }),
+        mouseout: e => e.target.setStyle({ fillOpacity: 0.6 })
+      });
+    }
+  }).addTo(map);
+
+  // Place markers from CSV for precise popup locations
+  const markerLatLngs = [];
+  csv.forEach(row => {
+    if (!row["Lat,Long"]) return;
+    const latlng = row["Lat,Long"].split(",").map(Number);
+    if (latlng.length !== 2 || isNaN(latlng[0]) || isNaN(latlng[1])) return;
+
+    const popupContent = `
+      <div class="popup">
+        <div class="popup-left">
+          <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
         </div>
-      `;
+        <div class="popup-right">
+          <h3>${row.name}</h3>
+          ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+          ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
+          ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
+          ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
+          ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
+          ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
+        </div>
+      </div>
+    `;
 
-      const marker = L.marker(latlng).addTo(map);
-      marker.bindPopup(popupContent);
+    const marker = L.marker(latlng).addTo(map);
+    marker.bindPopup(popupContent);
 
-      latlngs.push(latlng);
-    });
+    markerLatLngs.push(latlng);
+  });
 
-    if (latlngs.length > 0) map.fitBounds(latlngs);
-  })
-  .catch(err => console.error("CSV load error:", err));
+  // Fit map to all markers
+  if (markerLatLngs.length > 0) map.fitBounds(markerLatLngs);
+
+}).catch(err => console.error("Load error:", err));
 </script>
 </body>
 </html>

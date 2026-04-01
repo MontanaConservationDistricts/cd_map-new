@@ -14,9 +14,9 @@
         #map { width: 100%; height: 100%; }
         .popup-content { font-family: 'Open Sans', sans-serif; font-size: 13px; line-height: 1.6; }
         .popup-content img { width: 70px; height: auto; border-radius: 3px; margin-bottom: 8px; display: block; }
-        .popup-content h3 { margin: 0 0 8px 0; color: #1f4e79; font-size: 14px; font-weight: 600; }
+        .popup-content h3 { margin: 0 0 8px 0; color: #1f4e79; font-size: 15px; font-weight: 600; }
         .popup-content div { margin: 5px 0; }
-        .popup-content b { color: #333; }
+        .popup-content b { color: #333; font-weight: 600; }
         .popup-content a { color: #1f4e79; text-decoration: none; font-weight: 500; }
         .popup-content a:hover { text-decoration: underline; }
     </style>
@@ -37,13 +37,11 @@
 
         let bounds = [];
 
-        // Load Background
         fetch(backgroundUrl)
             .then(r => r.json())
             .then(data => L.geoJSON(data, { style: { color: "#ccc", weight: 1, fillColor: "#eee", fillOpacity: 1 } }).addTo(map))
             .catch(e => console.error('Background:', e));
 
-        // Load Districts
         fetch(geojsonUrl)
             .then(r => r.json())
             .then(data => {
@@ -57,7 +55,6 @@
             })
             .catch(e => console.error('Districts:', e));
 
-        // Load CSV
         fetch(csvUrl)
             .then(r => r.text())
             .then(csv => {
@@ -66,31 +63,21 @@
                     skipEmptyLines: true,
                     complete: (results) => {
                         const data = results.data || [];
-                        console.log(`Loaded ${data.length} districts`);
+                        console.log(`Loaded ${data.length} rows`);
 
-                        if (data.length > 0) {
-                            console.log('First row:', data[0]);
-                            console.log('Columns:', Object.keys(data[0]));
-                        }
+                        let markerCount = 0;
 
                         data.forEach((row, idx) => {
                             try {
                                 const latlng = (row['Lat,Long'] || '').trim();
-                                if (!latlng) {
-                                    console.warn(`Row ${idx}: Missing coordinates`);
-                                    return;
-                                }
+                                if (!latlng) return;
 
                                 const parts = latlng.split(',').map(s => parseFloat(s.trim()));
-                                if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
-                                    console.warn(`Row ${idx}: Invalid coordinates: ${latlng}`);
-                                    return;
-                                }
+                                if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return;
 
                                 const lat = parts[0];
                                 const lng = parts[1];
 
-                                // Get all fields
                                 const name = (row.name || '').trim() || 'District';
                                 const logo = (row.cd_logo || '').trim();
                                 const address = (row.physical_address || '').trim();
@@ -103,57 +90,40 @@
                                 const website = (row.Website || '').trim();
                                 const social = (row.social_media || '').trim();
 
-                                // Build full address
                                 let fullAddr = address;
                                 if (city) fullAddr += (fullAddr ? ', ' : '') + city;
                                 if (state) fullAddr += (fullAddr ? ', ' : '') + state;
                                 if (zip) fullAddr += (fullAddr ? ' ' : '') + zip;
 
-                                // Build popup
                                 let html = '<div class="popup-content">';
-                                
-                                if (logo) {
-                                    html += `<img src="${logo}" alt="${name}" onerror="this.style.display='none'">`;
-                                }
-                                
+                                if (logo) html += `<img src="${logo}" onerror="this.style.display='none'">`;
                                 html += `<h3>${name}</h3>`;
-                                
                                 if (fullAddr) html += `<div><b>Address:</b><br>${fullAddr}</div>`;
                                 if (phone) html += `<div><b>Phone:</b> <a href="tel:${phone}">${phone}</a></div>`;
                                 if (email) html += `<div><b>Email:</b> <a href="mailto:${email}">${email}</a></div>`;
                                 if (hours) html += `<div><b>Hours:</b><br>${hours}</div>`;
-                                if (website) html += `<div><a href="${website}" target="_blank" rel="noopener">Website</a></div>`;
-                                if (social) html += `<div><a href="${social}" target="_blank" rel="noopener">Social Media</a></div>`;
-                                
+                                if (website) html += `<div><a href="${website}" target="_blank">Website</a></div>`;
+                                if (social) html += `<div><a href="${social}" target="_blank">Social</a></div>`;
                                 html += '</div>';
 
-                                // Add marker
                                 L.marker([lat, lng]).bindPopup(html).addTo(map);
                                 bounds.push([lat, lng]);
-
-                                if (idx === 0) {
-                                    console.log(`✓ First marker: ${name} at [${lat}, ${lng}]`);
-                                }
+                                markerCount++;
 
                             } catch (e) {
-                                console.error(`Row ${idx} error:`, e.message);
+                                console.error(`Row ${idx}:`, e.message);
                             }
                         });
 
-                        // Fit map to all markers
+                        console.log(`Added ${markerCount} markers`);
+
                         if (bounds.length > 0) {
                             map.fitBounds(bounds, { padding: [50, 50] });
-                            console.log(`✓ Successfully added ${bounds.length} markers`);
-                        } else {
-                            console.warn('No markers added');
                         }
-                    },
-                    error: (err) => {
-                        console.error('CSV parse error:', err);
                     }
                 });
             })
-            .catch(e => console.error('CSV fetch error:', e));
+            .catch(e => console.error('CSV error:', e));
     </script>
 </body>
 </html>

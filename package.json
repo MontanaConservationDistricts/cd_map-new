@@ -1,51 +1,102 @@
-{
-  "name": "conservation-district-map",
-  "version": "1.0.3",
-  "description": "A boilerplate for building a fast static website with the Eleventy static site generator, for deployment to Netlify.",
-  "scripts": {
-    "dev": "npm-run-all --parallel bundle:*",
-    "bundle:eleventy": "eleventy --serve --quiet",
-    "bundle:parcel": "parcel '_assets/*' -d _site/_includes/assets",
-    "build": "run-s prod:*",
-    "prod:eleventy": "eleventy",
-    "prod:parcel": "parcel build '_assets/*' -d _site/_includes/assets"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/danurbanowicz/eleventy-netlify-boilerplate"
-  },
-  "author": {
-    "name": "Dan Urbanowicz",
-    "email": "dan.urbanowicz@gmail.com",
-    "url": "https://www.danurbanowicz.com/"
-  },
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/danurbanowicz/eleventy-netlify-boilerplate/issues"
-  },
-  "homepage": "https://github.com/danurbanowicz/eleventy-netlify-boilerplate",
-  "devDependencies": {
-    "@11ty/eleventy": "^1.0.1",
-    "@parcel/transformer-sass": "^2.6.2",
-    "luxon": "^2.3.0",
-    "markdown-it": "^12.3.2",
-    "markdown-it-anchor": "^8.4.1",
-    "npm-run-all": "^4.1.5",
-    "parcel-bundler": "^1.12.5",
-    "sass": "^1.53.0"
-  },
-  "dependencies": {
-    "@11ty/eleventy-navigation": "^0.3.2",
-    "@fortawesome/fontawesome-free": "^6.1.1",
-    "@popperjs/core": "^2.11.5",
-    "bootstrap": "^5.2.0-beta1",
-    "bootstrap-icons": "^1.8.3",
-    "clean-css": "^5.2.4",
-    "eleventy-plugin-svg-contents": "^0.7.0",
-    "eleventy-sass": "^1.3.1",
-    "html-minifier": "^4.0.0",
-    "jquery": "^3.6.0",
-    "leaflet": "^1.8.0",
-    "uglify-js": "^3.15.1"
-  }
-}
+<script>
+const map = L.map('map');
+
+// Base map
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+// FILES
+const districtsUrl = "data/district-boundaries_simplified-disable.geojson";
+const backgroundUrl = "data/MT_background.geojson";
+const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
+
+// Load everything
+Promise.all([
+  fetch(districtsUrl).then(r => r.json()),
+  fetch(backgroundUrl).then(r => r.json()),
+  fetch(csvUrl).then(r => r.text())
+]).then(([districts, background, csvText]) => {
+
+  const csv = Papa.parse(csvText, { header: true }).data;
+
+  // Build lookup using MACD_NAME
+  const lookup = {};
+  csv.forEach(row => {
+    if (row.MACD_NAME) {
+      lookup[row.MACD_NAME.trim().toLowerCase()] = row;
+    }
+  });
+
+  // Background (light gray Montana)
+  const bgLayer = L.geoJSON(background, {
+    style: {
+      color: "#cccccc",
+      weight: 1,
+      fillColor: "#eeeeee",
+      fillOpacity: 1
+    }
+  }).addTo(map);
+
+  // Districts layer (interactive)
+  const districtLayer = L.geoJSON(districts, {
+
+    style: {
+      color: "#ffffff",
+      weight: 1,
+      fillColor: "#2c6da4",
+      fillOpacity: 0.6
+    },
+
+    onEachFeature: function(feature, layer) {
+
+      const key = feature.properties.MACD_NAME?.trim().toLowerCase();
+      const row = lookup[key];
+
+      if (row) {
+
+        const popup = `
+          <div class="popup">
+            <div class="popup-left">
+              <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
+            </div>
+            <div class="popup-right">
+              <h3>${row.MACD_NAME}</h3>
+
+              ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+              ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
+              ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
+              ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
+
+              ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
+              ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
+            </div>
+          </div>
+        `;
+
+        layer.bindPopup(popup);
+      }
+
+      // Hover behavior (matches MACD feel)
+      layer.on({
+        mouseover: e => {
+          e.target.setStyle({
+            fillOpacity: 0.85
+          });
+        },
+        mouseout: e => {
+          e.target.setStyle({
+            fillOpacity: 0.6
+          });
+        }
+      });
+
+    }
+
+  }).addTo(map);
+
+  // Fit map perfectly to Montana
+  map.fitBounds(districtLayer.getBounds());
+
+});
+</script>

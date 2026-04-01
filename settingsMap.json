@@ -1,0 +1,29 @@
+{
+  "geojson": "/static/geospatial/district-boundaries_simplified.geojson",
+  "center": "{\"type\":\"Point\",\"coordinates\":[-109.9409893,47.0875274]}",
+  "zoom": 7,
+  "layers": {
+    "texture": {
+      "textureAdd": false,
+      "textureFile": "/static/geospatial/texture-tile-1.png"
+    },
+    "basemaps": [
+      {
+        "customBasemap": {
+          "enabled": false,
+          "url": " "
+        },
+        "presets": "mapbox basemap",
+        "targetPane": "basemap"
+      },
+      {
+        "customBasemap": {
+          "enabled": false,
+          "url": "https://..."
+        },
+        "presets": "mapbox labels",
+        "targetPane": "top"
+      }
+    ]
+  }
+}

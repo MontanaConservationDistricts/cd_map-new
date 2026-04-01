@@ -1,0 +1,96 @@
+@import "node_modules/bootstrap/scss/functions";
+@import "node_modules/bootstrap/scss/variables";
+@import "node_modules/bootstrap/scss/mixins";
+
+/* ----------------------------------------------------- */  
+/* ------------------ begin customization -------------- */   
+/* ----------------------------------------------------- */  
+
+
+//////////////////////////////////////
+//              COLORS              //
+//////////////////////////////////////
+
+$primary:       #38446B;
+$secondary:     #c7805f;
+$accent:        #93D6E5;
+$success:       $green !default;
+$info:          $cyan !default;
+$warning:       $yellow !default;
+$danger:        $red !default;
+$light:         $gray-100 !default;
+$dark:          $gray-800 !default;
+
+$theme-colors: () !default;
+$theme-colors: (
+    "primary":    $primary,
+    "secondary":  $secondary,
+    "accent":     $accent,
+    "success":    $success,
+    "info":       $info,
+    "warning":    $warning,
+    "danger":     $danger,
+    "light":      $light,
+    "dark":       $dark
+  );
+
+$link-color: $secondary;
+$link-hover-color: lighten($link-color, 10%);
+
+
+$navbar-light-color:                $primary;
+$navbar-light-hover-color:          lighten($primary, 10%);
+$navbar-light-active-color:         $primary;
+$navbar-light-disabled-color:       $gray-500;
+$navbar-light-toggler-icon-bg:      url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'><path stroke='#{$navbar-light-color}' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/></svg>");
+
+//////////////////////////////////////
+//            TYPOGRAPHY            //
+//////////////////////////////////////
+
+$font-size-base: 1rem;
+
+$headings-margin-bottom:      $spacer * .5;
+$headings-font-family:        null;
+$headings-font-style:         null;
+$headings-font-weight:        800;
+$headings-line-height:        1.2;
+$headings-color:              $primary;
+
+$display-font-sizes: (
+  1: 4.5rem,
+  2: 4rem,
+  3: 3.5rem,
+  4: 3rem,
+  5: 2.5rem,
+  6: 2rem
+);
+$display-font-weight: 700;
+$display-line-height: $headings-line-height;
+
+
+// Set a specific jump point for requesting color jumps
+$theme-color-interval:      8% !default;
+
+$font-family-sans-serif: 'Raleway', sans-serif;
+
+.scrollspy{
+	position: relative;
+}
+
+.meta {
+  font-size: .8rem;
+  line-height: 1.2;
+  margin-bottom: .2rem;
+  color: $primary;
+}
+
+
+/* ----------------------------------------------------- */  
+/* -------------- end customization -------------------- */  
+/* ----------------------------------------------------- */  
+
+
+@import "~bootstrap/scss/bootstrap.scss";
+
+

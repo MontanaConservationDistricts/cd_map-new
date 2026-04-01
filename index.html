@@ -1,4 +1,145 @@
-<!-- Adding CSV debugging and fixing data parsing issues -->
-<script>
-// Your CSV debugging code here
-</script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montana Conservation District Map</title>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; font-family: 'Open Sans', sans-serif; }
+        #map { width: 100%; height: 100%; }
+        .info { position: fixed; top: 10px; left: 10px; background: white; padding: 12px; border-radius: 4px; box-shadow: 0 0 15px rgba(0,0,0,0.2); z-index: 999; font-size: 12px; max-width: 350px; }
+        .info.loading { background: #e3f2fd; border-left: 4px solid #1976d2; }
+        .info.error { background: #ffebee; border-left: 4px solid #d32f2f; }
+        .info.success { background: #e8f5e9; border-left: 4px solid #388e3c; }
+        .popup-content { font-family: 'Open Sans', sans-serif; }
+        .popup-content h3 { margin: 0 0 8px 0; color: #1f4e79; font-size: 14px; }
+        .popup-content div { margin: 4px 0; font-size: 12px; }
+        .popup-content a { color: #1f4e79; text-decoration: none; }
+        .popup-content a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div id="info" class="info loading">
+        <div id="status">🚀 Loading map...</div>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        const STATUS = document.getElementById('status');
+        const INFO = document.getElementById('info');
+        const messages = [];
+
+        function updateStatus(msg, type = 'loading') {
+            console.log(msg);
+            messages.push(msg);
+            STATUS.textContent = messages.slice(-1)[0];
+            INFO.className = 'info ' + type;
+        }
+
+        // Initialize Leaflet map
+        const map = L.map('map').setView([46.8797, -110.3625], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        updateStatus('✓ Map initialized, loading data...');
+
+        // URLs
+        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?gid=203628658&single=true&output=csv";
+        const geojsonUrl = "./data/district-boundaries_simplified-disable.geojson";
+        const backgroundUrl = "./data/MT_background.geojson";
+
+        let bounds = [];
+
+        // Load Background GeoJSON
+        fetch(backgroundUrl)
+            .then(r => r.json())
+            .then(data => {
+                L.geoJSON(data, {
+                    style: { color: "#ccc", weight: 1, fillColor: "#eee", fillOpacity: 1 }
+                }).addTo(map);
+                updateStatus('✓ Background loaded');
+            })
+            .catch(e => updateStatus('Background error: ' + e.message, 'error'));
+
+        // Load District GeoJSON
+        fetch(geojsonUrl)
+            .then(r => r.json())
+            .then(data => {
+                L.geoJSON(data, {
+                    style: { color: "#fff", weight: 1, fillColor: "#2c6da4", fillOpacity: 0.6 },
+                    onEachFeature: (f, l) => {
+                        l.on('mouseover', () => l.setStyle({ fillOpacity: 0.85, weight: 2 }).bringToFront());
+                        l.on('mouseout', () => l.setStyle({ fillOpacity: 0.6, weight: 1 }));
+                    }
+                }).addTo(map);
+                updateStatus('✓ Districts loaded');
+            })
+            .catch(e => updateStatus('Districts error: ' + e.message, 'error'));
+
+        // Load CSV
+        fetch(csvUrl)
+            .then(r => r.text())
+            .then(csv => {
+                updateStatus('Parsing CSV...');
+                Papa.parse(csv, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        const data = results.data || [];
+                        updateStatus(`Processing ${data.length} records...`);
+
+                        data.forEach(row => {
+                            try {
+                                // Find lat/lng column
+                                let latlng = null;
+                                for (let key of Object.keys(row)) {
+                                    if (row[key] && /^-?\d+\.?\d*\s*[,/]\s*-?\d+\.?\d*$/.test(row[key])) {
+                                        latlng = row[key];
+                                        break;
+                                    }
+                                }
+                                if (!latlng) return;
+
+                                const [lat, lng] = latlng.replace(/\s/g, '').split(/[,/]/).map(parseFloat);
+                                if (isNaN(lat) || isNaN(lng)) return;
+                                if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
+
+                                // Build popup
+                                let html = '<div class="popup-content">';
+                                if (row['cd_logo']) {
+                                    html += `<img src="${row['cd_logo']}" style="width:60px;height:auto;border-radius:3px;" onerror="this.style.display='none'">`;
+                                }
+                                html += `<h3>${row['name'] || 'District'}</h3>`;
+                                if (row['physical_address']) html += `<div><b>Address:</b> ${row['physical_address']}</div>`;
+                                if (row['Phone']) html += `<div><b>Phone:</b> <a href="tel:${row['Phone']}">${row['Phone']}</a></div>`;
+                                if (row['Email']) html += `<div><b>Email:</b> <a href="mailto:${row['Email']}">${row['Email']}</a></div>`;
+                                if (row['Hours']) html += `<div><b>Hours:</b> ${row['Hours']}</div>`;
+                                if (row['Website']) html += `<div><a href="${row['Website']}" target="_blank">🌐 Website</a></div>`;
+                                if (row['social_media']) html += `<div><a href="${row['social_media']}" target="_blank">📱 Social</a></div>`;
+                                html += '</div>';
+
+                                L.marker([lat, lng]).bindPopup(html).addTo(map);
+                                bounds.push([lat, lng]);
+                            } catch (e) {
+                                console.log('Row skip:', e.message);
+                            }
+                        });
+
+                        if (bounds.length > 0) {
+                            map.fitBounds(bounds, { padding: [50, 50] });
+                        }
+                        updateStatus(`✓ Loaded ${bounds.length} markers`, 'success');
+                    }
+                });
+            })
+            .catch(e => updateStatus('CSV error: ' + e.message, 'error'));
+    </script>
+</body>
+</html>

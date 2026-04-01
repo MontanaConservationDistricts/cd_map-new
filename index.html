@@ -63,7 +63,7 @@
                     skipEmptyLines: true,
                     complete: (results) => {
                         const data = results.data || [];
-                        console.log(`Loaded ${data.length} rows`);
+                        console.log('Loaded ' + data.length + ' rows');
 
                         let markerCount = 0;
 
@@ -96,14 +96,28 @@
                                 if (zip) fullAddr += (fullAddr ? ' ' : '') + zip;
 
                                 let html = '<div class="popup-content">';
-                                if (logo) html += `<img src="${logo}" onerror="this.style.display='none'">`;
-                                html += `<h3>${name}</h3>`;
-                                if (fullAddr) html += `<div><b>Address:</b><br>${fullAddr}</div>`;
-                                if (phone) html += `<div><b>Phone:</b> <a href="tel:${phone}">${phone}</a></div>`;
-                                if (email) html += `<div><b>Email:</b> <a href="mailto:${email}">${email}</a></div>`;
-                                if (hours) html += `<div><b>Hours:</b><br>${hours}</div>`;
-                                if (website) html += `<div><a href="${website}" target="_blank">Website</a></div>`;
-                                if (social) html += `<div><a href="${social}" target="_blank">Social</a></div>`;
+                                if (logo) {
+                                    html += '<img src="' + logo + '" onerror="this.style.display=\'none\'">';
+                                }
+                                html += '<h3>' + name + '</h3>';
+                                if (fullAddr) {
+                                    html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
+                                }
+                                if (phone) {
+                                    html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
+                                }
+                                if (email) {
+                                    html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
+                                }
+                                if (hours) {
+                                    html += '<div><b>Hours:</b><br>' + hours + '</div>';
+                                }
+                                if (website) {
+                                    html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
+                                }
+                                if (social) {
+                                    html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
+                                }
                                 html += '</div>';
 
                                 L.marker([lat, lng]).bindPopup(html).addTo(map);
@@ -111,11 +125,11 @@
                                 markerCount++;
 
                             } catch (e) {
-                                console.error(`Row ${idx}:`, e.message);
+                                console.error('Row ' + idx + ':', e.message);
                             }
                         });
 
-                        console.log(`Added ${markerCount} markers`);
+                        console.log('Added ' + markerCount + ' markers');
 
                         if (bounds.length > 0) {
                             map.fitBounds(bounds, { padding: [50, 50] });

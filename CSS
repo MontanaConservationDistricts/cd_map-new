@@ -1,28 +1,35 @@
-.popup {
-  display: flex;
-  gap: 10px;
-  max-width: 260px;
+.popup-content {
+  font-family: 'Open Sans', sans-serif;
   font-size: 13px;
-  line-height: 1.4;
-  align-items: flex-start;
+  line-height: 1.5;
+  max-width: 260px;
 }
 
-.popup-left {
-  flex: 0 0 70px;
-  display: none; /* hide by default */
-}
-
-.popup-left img {
+.popup-content img {
   width: 70px;
   height: auto;
   border-radius: 4px;
+  display: block;
+  margin-bottom: 8px;
   object-fit: contain;
 }
 
-.popup-right {
-  flex: 1;
+.popup-content h3 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  color: #1f4e79;
+  font-weight: 600;
 }
 
-.popup-left img:only-child {
-  display: block;
+.popup-content div {
+  margin-bottom: 4px;
+}
+
+.popup-content a {
+  color: #1f4e79;
+  text-decoration: none;
+}
+
+.popup-content a:hover {
+  text-decoration: underline;
 }

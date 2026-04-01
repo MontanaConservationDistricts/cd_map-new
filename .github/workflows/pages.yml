@@ -1,0 +1,17 @@
+name: Deploy Pages
+
+on:
+  push:
+    branches: [ main ]  # deploy when main branch is updated
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

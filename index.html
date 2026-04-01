@@ -1,81 +1,71 @@
-<div id="map" style="height:600px;width:100%;"></div>
+<!-- Montana Conservation District Map -->
+<h2>Montana Conservation Districts Map</h2>
+<p>Click a marker for district details.</p>
+
+<div id="map" style="height:600px;width:100%; margin-bottom:30px;"></div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
+<style>
+.popup { display: flex; gap: 10px; max-width: 260px; font-size: 13px; line-height: 1.4; }
+.popup-left { flex: 0 0 70px; }
+.popup-left img { width: 70px; height: auto; border-radius: 4px; object-fit: contain; }
+.popup-right { flex: 1; }
+.popup-right h3 { margin: 0 0 4px; font-size: 15px; color: #1f4e79; }
+.popup a { color: #1f4e79; text-decoration: none; }
+.popup a:hover { text-decoration: underline; }
+</style>
+
 <script>
 const map = L.map('map').setView([46.8, -110.0], 6);
 
+// Base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
+// URLs
 const districtsUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/district-boundaries_simplified-disable.geojson";
 const backgroundUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/MT_background.geojson";
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
+// Load GeoJSON and CSV
 Promise.all([
   fetch(backgroundUrl).then(r=>r.json()),
   fetch(districtsUrl).then(r=>r.json()),
   fetch(csvUrl).then(r=>r.text())
 ]).then(([background, districts, csvText]) => {
 
-  // Parse CSV with header & trim
-  const csv = Papa.parse(csvText, {header:true, skipEmptyLines:true,
-      transformHeader:h=>h.trim().replace(/\s+/g,'_'),
-      transform:v=>v.trim()
+  // Parse CSV with cleaned headers
+  const csv = Papa.parse(csvText, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: h => h.trim().replace(/\s+/g,'_'),
+    transform: v => v.trim()
   }).data;
 
-  // Background
-  L.geoJSON(background, {style:{color:"#ccc",fillColor:"#eee",weight:1,fillOpacity:1}}).addTo(map);
+  // Background layer
+  L.geoJSON(background, {style:{color:"#ccc", fillColor:"#eee", weight:1, fillOpacity:1}}).addTo(map);
 
-  // Polygons
-  const polygonLayer = L.geoJSON(districts, {
-    style:{color:"#1f4e79",fillColor:"#2c6da4",weight:2,fillOpacity:0.5},
-    onEachFeature:(feature, layer) => {
-      // Find nearest marker from CSV by distance
-      const featureCenter = layer.getBounds().getCenter();
-      let nearest = null;
-      let minDist = Infinity;
-
-      csv.forEach(row => {
-        if(!row.Lat_Long) return;
-        const [lat,lng] = row.Lat_Long.split(",").map(Number);
-        const dist = Math.hypot(featureCenter.lat - lat, featureCenter.lng - lng);
-        if(dist<minDist){ minDist=dist; nearest=row; }
+  // Polygon layer (visual only)
+  L.geoJSON(districts, {
+    style:{color:"#1f4e79", fillColor:"#2c6da4", weight:2, fillOpacity:0.5},
+    onEachFeature:(feature, layer)=>{
+      layer.on({
+        mouseover: e=>e.target.setStyle({fillOpacity:0.8}),
+        mouseout: e=>e.target.setStyle({fillOpacity:0.5})
       });
-
-      if(nearest){
-        const popupContent = `
-          <div class="popup">
-            <div class="popup-left">
-              <img src="${nearest.cd_logo||'https://via.placeholder.com/70'}">
-            </div>
-            <div class="popup-right">
-              <h3>${nearest.name}</h3>
-              ${nearest.physical_address?`<div>${nearest.physical_address}</div>`:""}
-              ${nearest.Hours?`<div><strong>H:</strong> ${nearest.Hours}</div>`:""}
-              ${nearest.Phone?`<div><strong>P:</strong> ${nearest.Phone}</div>`:""}
-              ${nearest.Email?`<div><strong>E:</strong> ${nearest.Email}</div>`:""}
-              ${nearest.Website?`<div><a href='${nearest.Website}' target='_blank'>Website</a></div>`:""}
-              ${nearest.social_media?`<div><a href='${nearest.social_media}' target='_blank'>Social</a></div>`:""}
-            </div>
-          </div>
-        `;
-        layer.on('click',()=>L.popup().setLatLng(featureCenter).setContent(popupContent).openOn(map));
-      }
-
-      layer.on({mouseover:e=>e.target.setStyle({fillOpacity:0.8}),mouseout:e=>e.target.setStyle({fillOpacity:0.5})});
     }
   }).addTo(map);
 
-  // Place markers
+  // Add markers for each CSV row
   const markerLatLngs = [];
   csv.forEach(row=>{
     if(!row.Lat_Long) return;
-    const latlng = row.Lat_Long.split(",").map(Number);
-    if(latlng.length!==2||isNaN(latlng[0])) return;
+    const latlng = row.Lat_Long.split(',').map(Number);
+    if(latlng.length!==2 || isNaN(latlng[0]) || isNaN(latlng[1])) return;
 
     const popupContent = `
       <div class="popup">
@@ -84,12 +74,12 @@ Promise.all([
         </div>
         <div class="popup-right">
           <h3>${row.name}</h3>
-          ${row.physical_address?`<div>${row.physical_address}</div>`:""}
-          ${row.Hours?`<div><strong>H:</strong> ${row.Hours}</div>`:""}
-          ${row.Phone?`<div><strong>P:</strong> ${row.Phone}</div>`:""}
-          ${row.Email?`<div><strong>E:</strong> ${row.Email}</div>`:""}
-          ${row.Website?`<div><a href='${row.Website}' target='_blank'>Website</a></div>`:""}
-          ${row.social_media?`<div><a href='${row.social_media}' target='_blank'>Social</a></div>`:""}
+          ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+          ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
+          ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
+          ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
+          ${row.Website ? `<div><a href='${row.Website}' target='_blank'>Website</a></div>` : ""}
+          ${row.social_media ? `<div><a href='${row.social_media}' target='_blank'>Social</a></div>` : ""}
         </div>
       </div>
     `;
@@ -98,7 +88,8 @@ Promise.all([
     markerLatLngs.push(latlng);
   });
 
+  // Fit map to all markers
   if(markerLatLngs.length>0) map.fitBounds(markerLatLngs);
 
-}).catch(err=>console.error("Load error:",err));
+}).catch(err=>console.error("Load error:", err));
 </script>

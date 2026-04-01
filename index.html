@@ -1,160 +1,103 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Montana Conservation District Map</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
-  <style>
-    body {
-      margin: 0;
-      font-family: 'Open Sans', sans-serif;
-      background: #f5f5f5;
-    }
-
-    header {
-      background: #1f4e79;
-      color: white;
-      padding: 15px 20px;
-    }
-
-    header h1 {
-      margin: 0;
-      font-size: 20px;
-    }
-
-    #map {
-      height: calc(100vh - 60px);
-    }
-
-    /* Popup Layout */
-    .popup {
-      display: flex;
-      gap: 10px;
-      max-width: 260px;
-      font-size: 13px;
-      line-height: 1.4;
-    }
-
-    .popup-left {
-      flex: 0 0 70px;
-    }
-
-    .popup-left img {
-      width: 70px;
-      height: auto;
-      border-radius: 4px;
-      object-fit: contain;
-    }
-
-    .popup-right {
-      flex: 1;
-    }
-
-    .popup-right h3 {
-      margin: 0 0 4px;
-      font-size: 15px;
-      color: #1f4e79;
-    }
-
-    .popup-right div {
-      margin-bottom: 2px;
-    }
-
-    .popup a {
-      color: #1f4e79;
-      text-decoration: none;
-    }
-
-    .popup a:hover {
-      text-decoration: underline;
-    }
-  </style>
-</head>
-
-<body>
-
-<header>
-  <h1>Montana Conservation District Map</h1>
-</header>
-
-<div id="map"></div>
-
-<!-- Leaflet -->
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<!-- PapaParse -->
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
-
 <script>
-  // Initialize map
-  const map = L.map('map').setView([46.8, -110.0], 6);
+const map = L.map('map');
 
-  // Basemap
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+// Base map
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
 
-  // Google Sheet CSV (correct format)
-  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
+// FILES
+const districtsUrl = "data/district-boundaries_simplified-disable.geojson";
+const backgroundUrl = "data/MT_background.geojson";
+const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
-  Papa.parse(csvUrl, {
-    download: true,
-    header: true,
-    complete: function(results) {
+// Load everything
+Promise.all([
+  fetch(districtsUrl).then(r => r.json()),
+  fetch(backgroundUrl).then(r => r.json()),
+  fetch(csvUrl).then(r => r.text())
+]).then(([districts, background, csvText]) => {
 
-      results.data.forEach(row => {
+  const csv = Papa.parse(csvText, { header: true }).data;
 
-        if (row["Lat,Long"]) {
-          const coords = row["Lat,Long"].split(",");
-
-          const lat = parseFloat(coords[0]);
-          const lon = parseFloat(coords[1]);
-
-          if (!isNaN(lat) && !isNaN(lon)) {
-
-            const popup = `
-              <div class="popup">
-
-                <div class="popup-left">
-                  <img src="${row.cd_logo || 'https://via.placeholder.com/70'}" alt="Logo">
-                </div>
-
-                <div class="popup-right">
-                  <h3>${row.name || "District"}</h3>
-
-                  ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
-
-                  ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
-                  ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
-                  ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
-
-                  ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
-                  ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
-                </div>
-
-              </div>
-            `;
-
-            L.marker([lat, lon])
-              .addTo(map)
-              .bindPopup(popup);
-          }
-        }
-
-      });
-    },
-    error: function(err) {
-      console.error("CSV failed:", err);
+  // Build lookup using MACD_NAME
+  const lookup = {};
+  csv.forEach(row => {
+    if (row.MACD_NAME) {
+      lookup[row.MACD_NAME.trim().toLowerCase()] = row;
     }
   });
-</script>
 
-</body>
-</html>
+  // Background (light gray Montana)
+  const bgLayer = L.geoJSON(background, {
+    style: {
+      color: "#cccccc",
+      weight: 1,
+      fillColor: "#eeeeee",
+      fillOpacity: 1
+    }
+  }).addTo(map);
+
+  // Districts layer (interactive)
+  const districtLayer = L.geoJSON(districts, {
+
+    style: {
+      color: "#ffffff",
+      weight: 1,
+      fillColor: "#2c6da4",
+      fillOpacity: 0.6
+    },
+
+    onEachFeature: function(feature, layer) {
+
+      const key = feature.properties.MACD_NAME?.trim().toLowerCase();
+      const row = lookup[key];
+
+      if (row) {
+
+        const popup = `
+          <div class="popup">
+            <div class="popup-left">
+              <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
+            </div>
+            <div class="popup-right">
+              <h3>${row.MACD_NAME}</h3>
+
+              ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+              ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
+              ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
+              ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
+
+              ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
+              ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
+            </div>
+          </div>
+        `;
+
+        layer.bindPopup(popup);
+      }
+
+      // Hover behavior (matches MACD feel)
+      layer.on({
+        mouseover: e => {
+          e.target.setStyle({
+            fillOpacity: 0.85
+          });
+        },
+        mouseout: e => {
+          e.target.setStyle({
+            fillOpacity: 0.6
+          });
+        }
+      });
+
+    }
+
+  }).addTo(map);
+
+  // Fit map perfectly to Montana
+  map.fitBounds(districtLayer.getBounds());
+
+});
+</script>

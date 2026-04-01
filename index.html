@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Conservation District Map – MACD</title>
+  <title>Montana Conservation District Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- Fonts -->
@@ -33,25 +33,47 @@
       height: calc(100vh - 60px);
     }
 
+    /* Popup Layout */
     .popup {
-      font-size: 14px;
+      display: flex;
+      gap: 10px;
+      max-width: 260px;
+      font-size: 13px;
       line-height: 1.4;
     }
 
-    .popup h3 {
-      margin: 0 0 5px;
-      font-size: 16px;
+    .popup-left {
+      flex: 0 0 70px;
+    }
+
+    .popup-left img {
+      width: 70px;
+      height: auto;
+      border-radius: 4px;
+      object-fit: contain;
+    }
+
+    .popup-right {
+      flex: 1;
+    }
+
+    .popup-right h3 {
+      margin: 0 0 4px;
+      font-size: 15px;
       color: #1f4e79;
     }
 
-    .popup img {
-      max-width: 120px;
-      margin-bottom: 5px;
+    .popup-right div {
+      margin-bottom: 2px;
     }
 
     .popup a {
       color: #1f4e79;
       text-decoration: none;
+    }
+
+    .popup a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
@@ -71,13 +93,15 @@
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <script>
+  // Initialize map
   const map = L.map('map').setView([46.8, -110.0], 6);
 
+  // Basemap
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  // Google Sheet CSV
+  // Google Sheet CSV (correct format)
   const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
   Papa.parse(csvUrl, {
@@ -97,16 +121,24 @@
 
             const popup = `
               <div class="popup">
-                ${row.cd_logo ? `<img src="${row.cd_logo}">` : ""}
-                <h3>${row.name || "District"}</h3>
 
-                ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
-                ${row.Phone ? `<div><strong>Phone:</strong> ${row.Phone}</div>` : ""}
-                ${row.Email ? `<div><strong>Email:</strong> ${row.Email}</div>` : ""}
-                ${row.Hours ? `<div><strong>Hours:</strong> ${row.Hours}</div>` : ""}
+                <div class="popup-left">
+                  <img src="${row.cd_logo || 'https://via.placeholder.com/70'}" alt="Logo">
+                </div>
 
-                ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
-                ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social Media</a></div>` : ""}
+                <div class="popup-right">
+                  <h3>${row.name || "District"}</h3>
+
+                  ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+
+                  ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
+                  ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
+                  ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
+
+                  ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
+                  ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
+                </div>
+
               </div>
             `;
 
@@ -117,6 +149,9 @@
         }
 
       });
+    },
+    error: function(err) {
+      console.error("CSV failed:", err);
     }
   });
 </script>

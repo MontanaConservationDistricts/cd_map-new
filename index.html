@@ -142,16 +142,16 @@
                                 if (state) fullAddr += (fullAddr ? ', ' : '') + state;
                                 if (zip) fullAddr += (fullAddr ? ' ' : '') + zip;
 
-                                let html = '<div class="popup-content">';
-                                if (logo) html += '<img src="' + logo + '" onerror="this.style.display=' + "'none'" + '">';
-                                html += '<h3>' + name + '</h3>';
-                                if (fullAddr) html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
-                                if (phone) html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
-                                if (email) html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
-                                if (hours) html += '<div><b>Hours:</b><br>' + hours + '</div>';
-                                if (website) html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
-                                if (social) html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
-                                html += '</div>';
+                              let html = '<div class="popup-content">';
+if (logo) html += '<img src="' + logo + '" onerror="this.style.display=\'none\'">';
+html += '<h3>' + name + '</h3>';
+if (fullAddr) html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
+if (phone) html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
+if (email) html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
+if (hours) html += '<div><b>Hours:</b><br>' + hours + '</div>';
+if (website) html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
+if (social) html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
+html += '</div>';
 
                                 L.marker([lat, lng]).bindPopup(html).addTo(map);
                                 bounds.push([lat, lng]);

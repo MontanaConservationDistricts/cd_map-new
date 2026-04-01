@@ -1,24 +1,40 @@
-<!-- Montana Conservation District Map -->
-<h2>Montana Conservation Districts Map</h2>
-<p>Click a marker for district details.</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Montana Conservation District Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<div id="map" style="height:600px;width:100%; margin-bottom:30px;"></div>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
 
+<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <style>
-.popup { display: flex; gap: 10px; max-width: 260px; font-size: 13px; line-height: 1.4; }
-.popup-left { flex: 0 0 70px; }
-.popup-left img { width: 70px; height: auto; border-radius: 4px; object-fit: contain; }
-.popup-right { flex: 1; }
-.popup-right h3 { margin: 0 0 4px; font-size: 15px; color: #1f4e79; }
-.popup a { color: #1f4e79; text-decoration: none; }
-.popup a:hover { text-decoration: underline; }
+body { margin:0; font-family: 'Open Sans', sans-serif; }
+#map { height:100vh; width:100%; }
+
+.popup { display:flex; gap:10px; max-width:260px; font-size:13px; line-height:1.4; }
+.popup-left { flex:0 0 70px; }
+.popup-left img { width:70px; height:auto; border-radius:4px; object-fit:contain; }
+.popup-right { flex:1; }
+.popup-right h3 { margin:0 0 4px; font-size:15px; color:#1f4e79; }
+.popup a { color:#1f4e79; text-decoration:none; }
+.popup a:hover { text-decoration:underline; }
 </style>
+</head>
+
+<body>
+<div id="map"></div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- PapaParse JS -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <script>
+// Initialize map
 const map = L.map('map').setView([46.8, -110.0], 6);
 
 // Base map
@@ -31,14 +47,14 @@ const districtsUrl = "https://raw.githubusercontent.com/montanaconservationdistr
 const backgroundUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/MT_background.geojson";
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
-// Load GeoJSON and CSV
+// Load everything
 Promise.all([
   fetch(backgroundUrl).then(r=>r.json()),
   fetch(districtsUrl).then(r=>r.json()),
   fetch(csvUrl).then(r=>r.text())
 ]).then(([background, districts, csvText]) => {
 
-  // Parse CSV with cleaned headers
+  // Parse CSV and clean headers/values
   const csv = Papa.parse(csvText, {
     header: true,
     skipEmptyLines: true,
@@ -46,31 +62,66 @@ Promise.all([
     transform: v => v.trim()
   }).data;
 
+  // Build a lookup by cleaned district name
+  const lookup = {};
+  csv.forEach(row => {
+    if(row.name) lookup[row.name.toLowerCase()] = row;
+  });
+
   // Background layer
   L.geoJSON(background, {style:{color:"#ccc", fillColor:"#eee", weight:1, fillOpacity:1}}).addTo(map);
 
-  // Polygon layer (visual only)
-  L.geoJSON(districts, {
-    style:{color:"#1f4e79", fillColor:"#2c6da4", weight:2, fillOpacity:0.5},
+  // District polygons layer
+  const districtLayer = L.geoJSON(districts, {
+    style:{color:"#ffffff", fillColor:"#2c6da4", weight:1, fillOpacity:0.6},
     onEachFeature:(feature, layer)=>{
+      // Hover effect
       layer.on({
-        mouseover: e=>e.target.setStyle({fillOpacity:0.8}),
-        mouseout: e=>e.target.setStyle({fillOpacity:0.5})
+        mouseover:e=>e.target.setStyle({fillOpacity:0.85}),
+        mouseout:e=>e.target.setStyle({fillOpacity:0.6})
       });
+
+      // Find CSV row by district name
+      const key = feature.properties.MACD_NAME?.trim().toLowerCase();
+      const row = lookup[key];
+
+      if(row){
+        const popupContent = `
+          <div class="popup">
+            <div class="popup-left">
+              <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
+            </div>
+            <div class="popup-right">
+              <h3>${row.name}</h3>
+              ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+              ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
+              ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
+              ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
+              ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
+              ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
+            </div>
+          </div>
+        `;
+        // Open popup at polygon center
+        layer.on('click', () => {
+          const center = layer.getBounds().getCenter();
+          L.popup().setLatLng(center).setContent(popupContent).openOn(map);
+        });
+      }
     }
   }).addTo(map);
 
-  // Add markers for each CSV row
+  // Place markers using CSV Lat/Long
   const markerLatLngs = [];
   csv.forEach(row=>{
     if(!row.Lat_Long) return;
     const latlng = row.Lat_Long.split(',').map(Number);
-    if(latlng.length!==2 || isNaN(latlng[0]) || isNaN(latlng[1])) return;
+    if(latlng.length!==2 || isNaN(latlng[0])) return;
 
     const popupContent = `
       <div class="popup">
         <div class="popup-left">
-          <img src="${row.cd_logo||'https://via.placeholder.com/70'}">
+          <img src="${row.cd_logo || 'https://via.placeholder.com/70'}">
         </div>
         <div class="popup-right">
           <h3>${row.name}</h3>
@@ -78,8 +129,8 @@ Promise.all([
           ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
           ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
           ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
-          ${row.Website ? `<div><a href='${row.Website}' target='_blank'>Website</a></div>` : ""}
-          ${row.social_media ? `<div><a href='${row.social_media}' target='_blank'>Social</a></div>` : ""}
+          ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
+          ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
         </div>
       </div>
     `;
@@ -91,5 +142,7 @@ Promise.all([
   // Fit map to all markers
   if(markerLatLngs.length>0) map.fitBounds(markerLatLngs);
 
-}).catch(err=>console.error("Load error:", err));
+}).catch(err => console.error("Load error:", err));
 </script>
+</body>
+</html>

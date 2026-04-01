@@ -5,20 +5,16 @@
 <title>Montana Conservation District Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
 <style>
-body { margin:0; font-family: 'Open Sans', sans-serif; }
-#map { height:100vh; width:100%; }
+  body { margin: 0; }
+  #map { height: 100vh; width: 100%; }
 
-.popup { display:flex; gap:10px; max-width:260px; font-size:13px; line-height:1.4; }
-.popup-left { flex:0 0 70px; }
-.popup-left img { width:70px; height:auto; border-radius:4px; object-fit:contain; }
-.popup-right { flex:1; }
-.popup-right h3 { margin:0 0 4px; font-size:15px; color:#1f4e79; }
-.popup a { color:#1f4e79; text-decoration:none; }
-.popup a:hover { text-decoration:underline; }
+  .popup { display: flex; gap: 10px; max-width: 260px; font-size: 13px; line-height: 1.4; }
+  .popup-left img { width: 70px; border-radius: 4px; object-fit: contain; }
+  .popup-right h3 { margin: 0; font-size: 15px; color: #1f4e79; }
+  .popup a { color: #1f4e79; text-decoration: none; }
+  .popup a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -29,61 +25,60 @@ body { margin:0; font-family: 'Open Sans', sans-serif; }
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <script>
-// Initialize map
-const map = L.map('map').setView([46.8, -110], 6);
+const map = L.map('map').setView([46.8, -110.0], 6);
 
 // Base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-// URLs
-const districtsUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/district-boundaries_simplified-disable.geojson";
-const backgroundUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/MT_background.geojson";
+// GeoJSON and CSV URLs
+const districtsUrl = "./data/district-boundaries_simplified-disable.geojson";
+const backgroundUrl = "./data/MT_background.geojson";
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
-// Load all data
+// Load everything
 Promise.all([
-  fetch(backgroundUrl).then(r=>r.json()),
-  fetch(districtsUrl).then(r=>r.json()),
-  fetch(csvUrl).then(r=>r.text())
+  fetch(backgroundUrl).then(r => r.json()),
+  fetch(districtsUrl).then(r => r.json()),
+  fetch(csvUrl).then(r => r.text())
 ]).then(([background, districts, csvText]) => {
 
-  // Parse CSV
   const csv = Papa.parse(csvText, {
-    header:true,
-    skipEmptyLines:true,
-    transformHeader:h=>h.trim().replace(/\s+/g,'_'),
-    transform:v=>v.trim()
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: h => h.trim().replace(/\s+/g,'_'),
+    transform: v => v.trim()
   }).data;
 
-  // Build CSV lookup by name
+  // Build CSV lookup by district name
   const lookup = {};
-  csv.forEach(row => { if(row.name) lookup[row.name.toLowerCase()] = row; });
+  csv.forEach(row => {
+    if (row.name) lookup[row.name.toLowerCase()] = row;
+  });
 
   // Background layer
-  L.geoJSON(background, {style:{color:"#ccc", fillColor:"#eee", weight:1, fillOpacity:1}}).addTo(map);
+  L.geoJSON(background, {
+    style: { color:"#ccc", fillColor:"#eee", weight:1, fillOpacity:1 }
+  }).addTo(map);
 
   // District polygons
-  const districtLayer = L.geoJSON(districts, {
-    style:{color:"#ffffff", fillColor:"#2c6da4", weight:1, fillOpacity:0.6},
-    onEachFeature:(feature, layer)=>{
-      // Hover
+  const polygonLayer = L.geoJSON(districts, {
+    style: { color:"#fff", fillColor:"#2c6da4", weight:1, fillOpacity:0.6 },
+    onEachFeature: (feature, layer) => {
+      // Hover effect
       layer.on({
-        mouseover:e=>e.target.setStyle({fillOpacity:0.85}),
-        mouseout:e=>e.target.setStyle({fillOpacity:0.6})
+        mouseover: e => e.target.setStyle({ fillOpacity:0.85 }),
+        mouseout: e => e.target.setStyle({ fillOpacity:0.6 })
       });
 
-      // Match CSV row
-      const key = feature.properties.MACD_NAME?.trim().toLowerCase();
+      // Popup for polygon click
+      const key = (feature.properties.MACD_NAME || "").trim().toLowerCase();
       const row = lookup[key];
-
-      if(row){
-        const popupContent = `
+      if (row && row.Lat_Long) {
+        const popupHtml = `
           <div class="popup">
-            <div class="popup-left">
-              <img src="${row.cd_logo||'https://via.placeholder.com/70'}">
-            </div>
+            <div class="popup-left"><img src="${row.cd_logo || 'https://via.placeholder.com/70'}"></div>
             <div class="popup-right">
               <h3>${row.name}</h3>
               ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
@@ -95,44 +90,41 @@ Promise.all([
             </div>
           </div>
         `;
-        // Popup at polygon center
-        layer.on('click', ()=> {
-          const center = layer.getBounds().getCenter();
-          L.popup().setLatLng(center).setContent(popupContent).openOn(map);
+        layer.on('click', () => {
+          const latlng = row.Lat_Long.split(",").map(Number);
+          L.popup().setLatLng(latlng).setContent(popupHtml).openOn(map);
         });
       }
     }
   }).addTo(map);
 
-  // Add markers at CSV Lat/Long
-  const markerLatLngs = [];
-  csv.forEach(row=>{
-    if(!row.Lat_Long) return;
-    const latlng = row.Lat_Long.split(',').map(Number);
-    if(latlng.length!==2 || isNaN(latlng[0])) return;
-
-    const popupContent = `
-      <div class="popup">
-        <div class="popup-left">
-          <img src="${row.cd_logo||'https://via.placeholder.com/70'}">
+  // Markers from CSV Lat/Long
+  const markerCoords = [];
+  csv.forEach(row => {
+    if (!row.Lat_Long) return;
+    const latlng = row.Lat_Long.split(",").map(Number);
+    if (latlng.length === 2 && !isNaN(latlng[0])) {
+      const popupHtml = `
+        <div class="popup">
+          <div class="popup-left"><img src="${row.cd_logo || 'https://via.placeholder.com/70'}"></div>
+          <div class="popup-right">
+            <h3>${row.name}</h3>
+            ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+            ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
+            ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
+            ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
+            ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
+            ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
+          </div>
         </div>
-        <div class="popup-right">
-          <h3>${row.name}</h3>
-          ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
-          ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
-          ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
-          ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
-          ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
-          ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
-        </div>
-      </div>
-    `;
-    L.marker(latlng).addTo(map).bindPopup(popupContent);
-    markerLatLngs.push(latlng);
+      `;
+      L.marker(latlng).addTo(map).bindPopup(popupHtml);
+      markerCoords.push(latlng);
+    }
   });
 
   // Fit map to all markers
-  if(markerLatLngs.length>0) map.fitBounds(markerLatLngs);
+  if (markerCoords.length) map.fitBounds(markerCoords);
 
 }).catch(err => console.error("Load error:", err));
 </script>

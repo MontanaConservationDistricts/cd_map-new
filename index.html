@@ -30,7 +30,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors'
 }).addTo(map);
 
-// URLs (raw GitHub + Google Sheets CSV)
+// GitHub + CSV URLs
 const districtsUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/district-boundaries_simplified-disable.geojson";
 const backgroundUrl = "https://raw.githubusercontent.com/montanaconservationdistricts/cd_map-new/main/data/MT_background.geojson";
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
@@ -42,18 +42,19 @@ Promise.all([
   fetch(csvUrl).then(r => r.text())
 ]).then(([districts, background, csvText]) => {
 
+  // Parse CSV
   const csv = Papa.parse(csvText, { header: true, skipEmptyLines: true }).data;
 
-  // Build lookup from CSV: normalize names
+  // Build lookup by normalized district name
   const lookup = {};
   csv.forEach(row => {
     if (row.name) {
-      const key = row.name.trim().toLowerCase().replace(/\s+/g, ' ');
+      const key = row.name.trim().toLowerCase();
       lookup[key] = row;
     }
   });
 
-  // Background polygons
+  // Background layer
   L.geoJSON(background, {
     style: { color: "#cccccc", weight: 1, fillColor: "#eeeeee", fillOpacity: 1 }
   }).addTo(map);
@@ -62,17 +63,15 @@ Promise.all([
   const polygonLayer = L.geoJSON(districts, {
     style: { color: "#1f4e79", weight: 2, fillColor: "#2c6da4", fillOpacity: 0.5 },
     onEachFeature: (feature, layer) => {
-      // Normalize GeoJSON name
-      const name = (feature.properties.MACD_NAME ?? "").trim().toLowerCase().replace(/\s+/g, ' ');
+      const name = (feature.properties.MACD_NAME ?? "").trim().toLowerCase();
       const row = lookup[name];
 
-      // Hover effect
       layer.on({
         mouseover: e => e.target.setStyle({ fillOpacity: 0.8 }),
         mouseout: e => e.target.setStyle({ fillOpacity: 0.5 })
       });
 
-      // Click popup at polygon center
+      // Polygon click opens popup at polygon center
       if (row && feature.geometry) {
         const popupContent = `
           <div class="popup">
@@ -82,9 +81,9 @@ Promise.all([
             <div class="popup-right">
               <h3>${row.name}</h3>
               ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+              ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
               ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
               ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
-              ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
               ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
               ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
             </div>
@@ -98,7 +97,7 @@ Promise.all([
     }
   }).addTo(map);
 
-  // Markers at CSV Lat/Long
+  // Markers at Lat/Long from CSV
   const markerLatLngs = [];
   csv.forEach(row => {
     if (!row["Lat,Long"]) return;
@@ -113,22 +112,20 @@ Promise.all([
         <div class="popup-right">
           <h3>${row.name}</h3>
           ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
+          ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
           ${row.Phone ? `<div><strong>P:</strong> ${row.Phone}</div>` : ""}
           ${row.Email ? `<div><strong>E:</strong> ${row.Email}</div>` : ""}
-          ${row.Hours ? `<div><strong>H:</strong> ${row.Hours}</div>` : ""}
           ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
           ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social</a></div>` : ""}
         </div>
       </div>
     `;
 
-    const marker = L.marker(latlng).addTo(map);
-    marker.bindPopup(popupContent);
-
+    L.marker(latlng).addTo(map).bindPopup(popupContent);
     markerLatLngs.push(latlng);
   });
 
-  // Fit map to all polygons for complete view
+  // Fit map to all districts
   map.fitBounds(polygonLayer.getBounds());
 
 }).catch(err => console.error("Load error:", err));

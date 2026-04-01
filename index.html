@@ -1,16 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Montana Conservation District Map</title>
+  <meta charset="UTF-8">
+  <title>Conservation District Map – MACD</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; }
-    #map { height: 100vh; }
+    body {
+      margin: 0;
+      font-family: 'Open Sans', sans-serif;
+      background: #f5f5f5;
+    }
+
+    header {
+      background: #1f4e79;
+      color: white;
+      padding: 15px 20px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    #map {
+      height: calc(100vh - 60px);
+    }
 
     .popup {
       font-size: 14px;
@@ -20,6 +41,7 @@
     .popup h3 {
       margin: 0 0 5px;
       font-size: 16px;
+      color: #1f4e79;
     }
 
     .popup img {
@@ -28,33 +50,34 @@
     }
 
     .popup a {
-      color: #2a7ae2;
+      color: #1f4e79;
       text-decoration: none;
-    }
-
-    .popup a:hover {
-      text-decoration: underline;
     }
   </style>
 </head>
 
 <body>
 
+<header>
+  <h1>Montana Conservation District Map</h1>
+</header>
+
 <div id="map"></div>
 
+<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- PapaParse -->
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <script>
-  // Initialize map
   const map = L.map('map').setView([46.8, -110.0], 6);
 
-  // Basemap
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  // ✅ Google Sheet CSV
+  // Google Sheet CSV
   const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?output=csv&gid=203628658";
 
   Papa.parse(csvUrl, {
@@ -72,33 +95,28 @@
 
           if (!isNaN(lat) && !isNaN(lon)) {
 
-            // ✅ CLEAN POPUP DESIGN
-            const popupContent = `
+            const popup = `
               <div class="popup">
-                ${row.cd_logo ? `<img src="${row.cd_logo}" alt="Logo">` : ""}
+                ${row.cd_logo ? `<img src="${row.cd_logo}">` : ""}
                 <h3>${row.name || "District"}</h3>
 
-                ${row["physical_address"] ? `<div>${row["physical_address"]}</div>` : ""}
-
+                ${row.physical_address ? `<div>${row.physical_address}</div>` : ""}
                 ${row.Phone ? `<div><strong>Phone:</strong> ${row.Phone}</div>` : ""}
                 ${row.Email ? `<div><strong>Email:</strong> ${row.Email}</div>` : ""}
                 ${row.Hours ? `<div><strong>Hours:</strong> ${row.Hours}</div>` : ""}
 
-                ${row.Website ? `<div><a href="${row.Website}" target="_blank">Visit Website</a></div>` : ""}
+                ${row.Website ? `<div><a href="${row.Website}" target="_blank">Website</a></div>` : ""}
                 ${row.social_media ? `<div><a href="${row.social_media}" target="_blank">Social Media</a></div>` : ""}
               </div>
             `;
 
             L.marker([lat, lon])
               .addTo(map)
-              .bindPopup(popupContent);
+              .bindPopup(popup);
           }
         }
 
       });
-    },
-    error: function(err) {
-      console.error("CSV failed:", err);
     }
   });
 </script>

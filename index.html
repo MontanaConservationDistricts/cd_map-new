@@ -8,31 +8,27 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { width: 100%; height: 100%; font-family: 'Open Sans', sans-serif; }
         #map { width: 100%; height: 100%; }
 
-        /* Clean popup styling */
         .popup-content {
-            font-family: 'Open Sans', sans-serif;
             font-size: 13px;
             line-height: 1.5;
             max-width: 260px;
         }
         .popup-content img {
             width: 70px;
-            height: auto;
-            border-radius: 4px;
             display: block;
             margin-bottom: 8px;
-            object-fit: contain;
+            border-radius: 4px;
         }
         .popup-content h3 {
             margin: 0 0 4px 0;
             font-size: 15px;
             color: #1f4e79;
-            font-weight: 600;
         }
         .popup-content div {
             margin-bottom: 4px;
@@ -41,108 +37,121 @@
             color: #1f4e79;
             text-decoration: none;
         }
-        .popup-content a:hover {
-            text-decoration: underline;
-        }
     </style>
 </head>
+
 <body>
-    <div id="map"></div>
+<div id="map"></div>
 
-    <script>
-        const map = L.map('map').setView([46.8797, -110.3625], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: 'OpenStreetMap',
-            maxZoom: 19
+<script>
+const map = L.map('map').setView([46.8797, -110.3625], 6);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'OpenStreetMap',
+    maxZoom: 19
+}).addTo(map);
+
+const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?gid=203628658&single=true&output=csv";
+const geojsonUrl = "./data/district-boundaries_simplified-disable.geojson";
+const backgroundUrl = "./data/MT_background.geojson";
+
+let bounds = [];
+
+// Background
+fetch(backgroundUrl)
+    .then(r => r.json())
+    .then(data => L.geoJSON(data, {
+        style: { color: "#ccc", weight: 1, fillColor: "#eee", fillOpacity: 1 }
+    }).addTo(map));
+
+// Districts
+fetch(geojsonUrl)
+    .then(r => r.json())
+    .then(data => {
+        L.geoJSON(data, {
+            style: { color: "#fff", weight: 1, fillColor: "#2c6da4", fillOpacity: 0.6 },
+            onEachFeature: (f, l) => {
+                l.on('mouseover', () => l.setStyle({ fillOpacity: 0.85, weight: 2 }));
+                l.on('mouseout', () => l.setStyle({ fillOpacity: 0.6, weight: 1 }));
+            }
         }).addTo(map);
+    });
 
-        const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?gid=203628658&single=true&output=csv";
-        const geojsonUrl = "./data/district-boundaries_simplified-disable.geojson";
-        const backgroundUrl = "./data/MT_background.geojson";
+// CSV markers
+fetch(csvUrl)
+.then(r => r.text())
+.then(csv => {
+    Papa.parse(csv, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+            const data = results.data || [];
 
-        let bounds = [];
+            data.forEach(row => {
 
-        // Add background
-        fetch(backgroundUrl)
-            .then(r => r.json())
-            .then(data => L.geoJSON(data, { style: { color: "#ccc", weight: 1, fillColor: "#eee", fillOpacity: 1 } }).addTo(map))
-            .catch(() => {});
+                // --- FIXED LAT/LONG PARSING ---
+                const latlngRaw = row['Lat,Long'];
+                if (!latlngRaw) return;
 
-        // Add district boundaries
-        fetch(geojsonUrl)
-            .then(r => r.json())
-            .then(data => {
-                L.geoJSON(data, {
-                    style: { color: "#fff", weight: 1, fillColor: "#2c6da4", fillOpacity: 0.6 },
-                    onEachFeature: (feature, layer) => {
-                        layer.on('mouseover', () => layer.setStyle({ fillOpacity: 0.85, weight: 2 }).bringToFront());
-                        layer.on('mouseout', () => layer.setStyle({ fillOpacity: 0.6, weight: 1 }));
-                    }
-                }).addTo(map);
-            })
-            .catch(() => {});
+                const cleaned = latlngRaw.replace(/"/g, '').trim();
+                const parts = cleaned.split(',');
+                if (parts.length !== 2) return;
 
-        // Add markers from CSV
-        fetch(csvUrl)
-            .then(r => r.text())
-            .then(csv => {
-                Papa.parse(csv, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: (results) => {
-                        const data = results.data || [];
-                        data.forEach(row => {
-                            const latlng = (row['Lat,Long'] || '').trim();
-                            if (!latlng) return;
+                const lat = parseFloat(parts[0].trim());
+                let lng = parseFloat(parts[1].trim());
 
-                            const parts = latlng.split(',').map(s => parseFloat(s.trim()));
-                            if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return;
+                // Force Montana longitude to negative if needed
+                if (lng > 0) lng = -lng;
 
-                            const lat = parts[0];
-                            const lng = parts[1];
+                if (
+                    isNaN(lat) || isNaN(lng) ||
+                    lat < -90 || lat > 90 ||
+                    lng < -180 || lng > 180
+                ) return;
 
-                            const name = (row.name || '').trim() || 'District';
-                            const logo = (row.cd_logo || '').trim();
-                            const address = (row.physical_address || '').trim();
-                            const city = (row.city || '').trim();
-                            const state = (row.state || '').trim();
-                            const zip = (row.zip || '').trim();
-                            const hours = (row.Hours || '').trim();
-                            const phone = (row.Phone || '').trim();
-                            const email = (row.Email || '').trim();
-                            const website = (row.Website || '').trim();
-                            const social = (row.social_media || '').trim();
+                // --- DATA ---
+                const name = (row.name || '').trim() || 'District';
+                const logo = (row.cd_logo || '').trim();
+                const address = (row.physical_address || '').trim();
+                const city = (row.city || '').trim();
+                const state = (row.state || '').trim();
+                const zip = (row.zip || '').trim();
+                const hours = (row.Hours || '').trim();
+                const phone = (row.Phone || '').trim();
+                const email = (row.Email || '').trim();
+                const website = (row.Website || '').trim();
+                const social = (row.social_media || '').trim();
 
-                            let fullAddr = address;
-                            if (city) fullAddr += (fullAddr ? ', ' : '') + city;
-                            if (state) fullAddr += (fullAddr ? ', ' : '') + state;
-                            if (zip) fullAddr += (fullAddr ? ' ' : '') + zip;
+                let fullAddr = address;
+                if (city) fullAddr += (fullAddr ? ', ' : '') + city;
+                if (state) fullAddr += (fullAddr ? ', ' : '') + state;
+                if (zip) fullAddr += (fullAddr ? ' ' : '') + zip;
 
-                            // Build clean popup
-                            let html = '<div class="popup-content">';
-                            if (logo) html += '<img src="' + logo + '" onerror="this.style.display=\'none\'">';
-                            html += '<h3>' + name + '</h3>';
-                            if (fullAddr) html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
-                            if (phone) html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
-                            if (email) html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
-                            if (hours) html += '<div><b>Hours:</b><br>' + hours + '</div>';
-                            if (website) html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
-                            if (social) html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
-                            html += '</div>';
+                // --- POPUP ---
+                let html = '<div class="popup-content">';
+                if (logo) html += '<img src="' + logo + '" onerror="this.style.display=\'none\'">';
+                html += '<h3>' + name + '</h3>';
+                if (fullAddr) html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
+                if (phone) html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
+                if (email) html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
+                if (hours) html += '<div><b>Hours:</b><br>' + hours + '</div>';
+                if (website) html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
+                if (social) html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
+                html += '</div>';
 
-                            // Add marker and bind popup
-                            L.marker([lat, lng])
-                                .bindPopup(html)
-                                .addTo(map);
+                L.marker([lat, lng])
+                    .bindPopup(html)
+                    .addTo(map);
 
-                            bounds.push([lat, lng]);
-                        });
+                bounds.push([lat, lng]);
+            });
 
-                        if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] });
-                    }
-                });
-            })
-            .catch(() => {});
-    </script>
+            if (bounds.length > 0) {
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }
+    });
+});
+</script>
 </body>
 </html>

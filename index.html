@@ -5,47 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Montana Conservation District Map</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
 
 <style>
-html, body {
-  height: 100%;
-  margin: 0;
-  font-family: 'Open Sans', sans-serif;
-}
+html, body { height:100%; margin:0; }
+#map { height:100%; }
 
-#map {
-  height: 100%;
-  width: 100%;
-}
-
-.popup-content {
-  font-size: 13px;
-  max-width: 260px;
-}
-.popup-content img {
-  width: 70px;
-  margin-bottom: 8px;
-  border-radius: 4px;
-}
-.popup-content h3 {
-  margin: 0 0 4px;
-  font-size: 15px;
-  color: #1f4e79;
-}
-.popup-content div {
-  margin-bottom: 4px;
-}
-.popup-content a {
-  color: #1f4e79;
-  text-decoration: none;
-}
-.popup-content a:hover {
-  text-decoration: underline;
-}
+.popup-content { font-size:13px; max-width:260px; }
 </style>
 </head>
 
@@ -53,172 +21,84 @@ html, body {
 <div id="map"></div>
 
 <script>
-// ======================
-// MAP SETUP
-// ======================
 const map = L.map('map').setView([46.8797, -110.3625], 6);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: 'OpenStreetMap',
-  maxZoom: 19
+  attribution: 'OpenStreetMap'
 }).addTo(map);
 
-// ======================
-// DATA SOURCES
-// ======================
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?gid=203628658&single=true&output=csv";
-const geojsonUrl = "./data/district-boundaries_simplified-disable.geojson";
-const backgroundUrl = "./data/MT_background.geojson";
 
-let bounds = [];
-
-// ======================
-// BACKGROUND LAYER
-// ======================
-fetch(backgroundUrl)
-  .then(r => r.json())
-  .then(data => {
-    L.geoJSON(data, {
-      style: {
-        color: "#ccc",
-        weight: 1,
-        fillColor: "#eee",
-        fillOpacity: 1
-      }
-    }).addTo(map);
-  });
-
-// ======================
-// DISTRICT BOUNDARIES
-// ======================
-fetch(geojsonUrl)
-  .then(r => r.json())
-  .then(data => {
-    L.geoJSON(data, {
-      style: {
-        color: "#fff",
-        weight: 1,
-        fillColor: "#2c6da4",
-        fillOpacity: 0.6
-      },
-      onEachFeature: (feature, layer) => {
-        layer.on('mouseover', () => {
-          layer.setStyle({ fillOpacity: 0.85, weight: 2 });
-        });
-        layer.on('mouseout', () => {
-          layer.setStyle({ fillOpacity: 0.6, weight: 1 });
-        });
-      }
-    }).addTo(map);
-  });
-
-// ======================
-// LOAD CSV + MARKERS
-// ======================
 fetch(csvUrl)
-  .then(r => r.text())
-  .then(csv => {
+.then(r => r.text())
+.then(csv => {
 
-    Papa.parse(csv, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
+  Papa.parse(csv, {
+    header: true,
+    skipEmptyLines: true,
+    complete: (results) => {
 
-        const data = results.data || [];
+      const data = results.data;
 
-        data.forEach(row => {
+      // 🔍 LOG FIRST ROW (IMPORTANT)
+      console.log("HEADERS:", Object.keys(data[0]));
+      console.log("FIRST ROW:", data[0]);
 
-          // ======================
-          // CORRECT LAT/LNG
-          // ======================
-          const lat = parseFloat(row['Lat']);
-          const lng = parseFloat(row['Long']);
+      data.forEach(row => {
 
-          if (
-            isNaN(lat) || isNaN(lng) ||
-            lat < -90 || lat > 90 ||
-            lng < -180 || lng > 180
-          ) return;
-
-          // ======================
-          // DATA FIELDS
-          // ======================
-          const name = (row.name || '').trim() || 'District';
-          const logo = (row.cd_logo || '').trim();
-          const address = (row.physical_address || '').trim();
-          const city = (row.city || '').trim();
-          const state = (row.state || '').trim();
-          const zip = (row.zip || '').trim();
-          const hours = (row.Hours || '').trim();
-          const phone = (row.Phone || '').trim();
-          const email = (row.Email || '').trim();
-          const website = (row.Website || '').trim();
-          const social = (row.social_media || '').trim();
-
-          let fullAddr = address;
-          if (city) fullAddr += (fullAddr ? ', ' : '') + city;
-          if (state) fullAddr += (fullAddr ? ', ' : '') + state;
-          if (zip) fullAddr += ' ' + zip;
-
-          // ======================
-          // POPUP
-          // ======================
-          let html = '<div class="popup-content">';
-
-          if (logo) {
-            html += '<img src="' + logo + '" onerror="this.style.display=\'none\'">';
-          }
-
-          html += '<h3>' + name + '</h3>';
-
-          if (fullAddr) {
-            html += '<div><b>Address:</b><br>' + fullAddr + '</div>';
-          }
-
-          if (phone) {
-            html += '<div><b>Phone:</b> <a href="tel:' + phone + '">' + phone + '</a></div>';
-          }
-
-          if (email) {
-            html += '<div><b>Email:</b> <a href="mailto:' + email + '">' + email + '</a></div>';
-          }
-
-          if (hours) {
-            html += '<div><b>Hours:</b><br>' + hours + '</div>';
-          }
-
-          if (website) {
-            html += '<div><a href="' + website + '" target="_blank">Website</a></div>';
-          }
-
-          if (social) {
-            html += '<div><a href="' + social + '" target="_blank">Social</a></div>';
-          }
-
-          html += '</div>';
-
-          // ======================
-          // ADD MARKER
-          // ======================
-          L.marker([lat, lng])
-            .bindPopup(html)
-            .addTo(map);
-
-          bounds.push([lat, lng]);
-
+        // =========================
+        // NORMALIZE KEYS
+        // =========================
+        const clean = {};
+        Object.keys(row).forEach(k => {
+          clean[k.trim().toLowerCase()] = row[k];
         });
 
-        // ======================
-        // FIT MAP
-        // ======================
-        if (bounds.length > 0) {
-          map.fitBounds(bounds, { padding: [50, 50] });
+        // =========================
+        // GET LAT/LNG (SAFE)
+        // =========================
+        let lat = parseFloat(clean['lat']);
+        let lng = parseFloat(clean['long']);
+
+        // FORCE parse if strings have spaces
+        if (typeof clean['lat'] === 'string') {
+          lat = parseFloat(clean['lat'].trim());
+        }
+        if (typeof clean['long'] === 'string') {
+          lng = parseFloat(clean['long'].trim());
         }
 
-      }
-    });
+        // DEBUG ONE ROW
+        if (!isNaN(lat) && !isNaN(lng)) {
+          console.log("VALID:", lat, lng);
+        }
 
+        if (
+          isNaN(lat) || isNaN(lng) ||
+          lat < -90 || lat > 90 ||
+          lng < -180 || lng > 180
+        ) return;
+
+        // =========================
+        // POPUP
+        // =========================
+        const name = clean['name'] || 'District';
+
+        const html = `<div class="popup-content">
+          <b>${name}</b><br>
+          ${clean['city'] || ''}
+        </div>`;
+
+        L.marker([lat, lng])
+          .bindPopup(html)
+          .addTo(map);
+
+      });
+
+    }
   });
+
+});
 </script>
 </body>
 </html>

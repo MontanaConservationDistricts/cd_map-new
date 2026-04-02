@@ -70,10 +70,14 @@ fetch(csvUrl)
             if(k) clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
           });
 
-          // Parse lat/lng safely
-          const lat = parseFloat(clean['lat']);
-          const lng = parseFloat(clean['long']);
-          if (isNaN(lat) || isNaN(lng)) return; // skip invalid
+// Parse lat/lng safely
+let lat = clean['lat'] ? clean['lat'].replace(',', '').trim() : '';
+let lng = clean['long'] ? clean['long'].replace(',', '').trim() : '';
+
+lat = parseFloat(lat);
+lng = parseFloat(lng);
+
+if (isNaN(lat) || isNaN(lng)) return; // skip invalid
 
           // Build popup from the CSV row
           const html = `<div class="popup-content">

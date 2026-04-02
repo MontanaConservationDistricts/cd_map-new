@@ -12,7 +12,6 @@
 <style>
 html, body { height:100%; margin:0; }
 #map { height:100%; }
-
 .popup-content { font-size:13px; max-width:260px; }
 </style>
 </head>
@@ -34,59 +33,39 @@ fetch(csvUrl)
 .then(csv => {
 
   Papa.parse(csv, {
-    header: true,
-    skipEmptyLines: true,
+    header: true,           // Treat first row as header
+    skipEmptyLines: true,   // Skip empty rows
+    dynamicTyping: true,    // Auto-convert numbers
     complete: (results) => {
 
       const data = results.data;
 
-      // 🔍 LOG FIRST ROW (IMPORTANT)
       console.log("HEADERS:", Object.keys(data[0]));
       console.log("FIRST ROW:", data[0]);
 
       data.forEach(row => {
 
-        // =========================
-        // NORMALIZE KEYS
-        // =========================
+        // Normalize keys & trim
         const clean = {};
         Object.keys(row).forEach(k => {
-          clean[k.trim().toLowerCase()] = row[k];
+          if(k) clean[k.trim().toLowerCase()] = row[k]?.toString().trim();
         });
 
-        // =========================
-        // GET LAT/LNG (SAFE)
-        // =========================
-        let lat = parseFloat(clean['lat']);
-        let lng = parseFloat(clean['long']);
+        // Parse lat/lng safely
+        const lat = parseFloat(clean['lat']);
+        const lng = parseFloat(clean['long']);
+        if (isNaN(lat) || isNaN(lng)) return;
 
-        // FORCE parse if strings have spaces
-        if (typeof clean['lat'] === 'string') {
-          lat = parseFloat(clean['lat'].trim());
-        }
-        if (typeof clean['long'] === 'string') {
-          lng = parseFloat(clean['long'].trim());
-        }
-
-        // DEBUG ONE ROW
-        if (!isNaN(lat) && !isNaN(lng)) {
-          console.log("VALID:", lat, lng);
-        }
-
-        if (
-          isNaN(lat) || isNaN(lng) ||
-          lat < -90 || lat > 90 ||
-          lng < -180 || lng > 180
-        ) return;
-
-        // =========================
-        // POPUP
-        // =========================
-        const name = clean['name'] || 'District';
-
+        // Build popup content with all relevant info
         const html = `<div class="popup-content">
-          <b>${name}</b><br>
-          ${clean['city'] || ''}
+          <b>${clean['name'] || ''}</b><br>
+          ${clean['physical_address'] || ''}<br>
+          ${clean['city'] || ''}, ${clean['state'] || ''} ${clean['zip'] || ''}<br>
+          ${clean['hours'] || ''}<br>
+          ${clean['phone'] || ''}<br>
+          ${clean['email'] || ''}<br>
+          ${clean['website'] ? `<a href="${clean['website']}" target="_blank">${clean['website']}</a>` : ''}<br>
+          ${clean['social_media'] || ''}
         </div>`;
 
         L.marker([lat, lng])

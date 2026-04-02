@@ -33,9 +33,9 @@ fetch(csvUrl)
 .then(csv => {
 
   Papa.parse(csv, {
-    header: true,           // Treat first row as header
-    skipEmptyLines: true,   // Skip empty rows
-    dynamicTyping: true,    // Auto-convert numbers
+    header: true,
+    skipEmptyLines: true,
+    transform: (value) => value.trim(), // Remove spaces
     complete: (results) => {
 
       const data = results.data;
@@ -45,29 +45,27 @@ fetch(csvUrl)
 
       data.forEach(row => {
 
-        // Normalize keys & trim
+        // Normalize keys
         const clean = {};
         Object.keys(row).forEach(k => {
-          if(k) clean[k.trim().toLowerCase()] = row[k]?.toString().trim();
+          if (k) clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
         });
 
         // Parse lat/lng safely
-        const lat = parseFloat(clean['lat']);
-        const lng = parseFloat(clean['long']);
+        let lat = parseFloat(clean['lat']);
+        let lng = parseFloat(clean['long']);
+
+        // Skip invalid coordinates
         if (isNaN(lat) || isNaN(lng)) return;
 
-        // Build popup content with all relevant info
+        // Build popup HTML exactly like before
+        const name = clean['name'] || 'District';
         const html = `<div class="popup-content">
-          <b>${clean['name'] || ''}</b><br>
-          ${clean['physical_address'] || ''}<br>
-          ${clean['city'] || ''}, ${clean['state'] || ''} ${clean['zip'] || ''}<br>
-          ${clean['hours'] || ''}<br>
-          ${clean['phone'] || ''}<br>
-          ${clean['email'] || ''}<br>
-          ${clean['website'] ? `<a href="${clean['website']}" target="_blank">${clean['website']}</a>` : ''}<br>
-          ${clean['social_media'] || ''}
+          <b>${name}</b><br>
+          ${clean['city'] || ''}
         </div>`;
 
+        // Add marker
         L.marker([lat, lng])
           .bindPopup(html)
           .addTo(map);

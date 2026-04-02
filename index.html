@@ -16,6 +16,7 @@ html, body {
   margin: 0;
   font-family: 'Open Sans', sans-serif;
 }
+
 #map {
   height: 100%;
   width: 100%;
@@ -128,10 +129,10 @@ fetch(csvUrl)
         data.forEach(row => {
 
           // ======================
-          // STRICT LAT/LNG (NEW)
+          // CORRECT LAT/LNG
           // ======================
-          const lat = parseFloat(row['Latitude']);
-          const lng = parseFloat(row['Longitude']);
+          const lat = parseFloat(row['Lat']);
+          const lng = parseFloat(row['Long']);
 
           if (
             isNaN(lat) || isNaN(lng) ||

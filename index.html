@@ -31,7 +31,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 // =========================
-// Load GeoJSON layer (your background / district boundaries)
+// Optional: GeoJSON layer (if you have a background boundary)
 // =========================
 const geojsonUrl = './data/district-boundaries_simplified-disable.geojson'; // adjust path
 fetch(geojsonUrl)
@@ -43,7 +43,7 @@ fetch(geojsonUrl)
   });
 
 // =========================
-// Load CSV markers
+// CSV markers
 // =========================
 const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?gid=203628658&single=true&output=csv";
 
@@ -52,27 +52,30 @@ fetch(csvUrl)
   .then(csv => {
 
     Papa.parse(csv, {
-      header: true,             // First row = header
-      skipEmptyLines: true,     // Ignore empty rows
-      transform: value => value ? value.trim() : '', // Trim spaces
+      header: true,
+      skipEmptyLines: true,
+      transform: value => value ? value.trim() : '', // remove extra spaces
       complete: (results) => {
 
         const data = results.data;
+
+        console.log("HEADERS:", Object.keys(data[0]));
+        console.log("FIRST ROW:", data[0]);
 
         data.forEach(row => {
 
           // Normalize keys
           const clean = {};
           Object.keys(row).forEach(k => {
-            if (k) clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
+            if(k) clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
           });
 
-          // Parse lat/lng
+          // Parse lat/lng safely
           const lat = parseFloat(clean['lat']);
           const lng = parseFloat(clean['long']);
           if (isNaN(lat) || isNaN(lng)) return; // skip invalid
 
-          // Build popup from full row
+          // Build popup from the CSV row
           const html = `<div class="popup-content">
             <b>${clean['name'] || ''}</b><br>
             ${clean['cd_logo'] ? `<img src="${clean['cd_logo']}" alt="${clean['name']}" style="max-width:100px;"><br>` : ''}
@@ -85,7 +88,7 @@ fetch(csvUrl)
             ${clean['social_media'] || ''}
           </div>`;
 
-          // Add marker
+          // Add marker tied to this row's lat/lng
           L.marker([lat, lng])
             .bindPopup(html)
             .addTo(map);

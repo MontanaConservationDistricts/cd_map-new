@@ -89,7 +89,7 @@ fetch(csvUrl)
           if (isNaN(lat) || isNaN(lng)) return;
 
           // =========================
-          // FIX IMAGE URL
+          // FIX IMAGE URL (UPDATED)
           // =========================
           let logo = clean['cd_logo'] || '';
 
@@ -99,8 +99,13 @@ fetch(csvUrl)
             logo = `https://drive.google.com/uc?export=view&id=${match[1]}`;
           }
 
-          // Final cleanup
-          if (!logo.startsWith('http')) logo = '';
+          // Base URL for GitHub Pages
+          const baseUrl = "https://montanaconservationdistricts.github.io/cd_map-new/";
+
+          // If it's a relative path, prepend base URL
+          if (logo && !logo.startsWith('http')) {
+            logo = baseUrl + logo.replace(/^\/+/, '');
+          }
 
           // =========================
           // Build popup

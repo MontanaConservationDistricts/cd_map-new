@@ -100,12 +100,11 @@ fetch(csvUrl)
           }
 console.log("IMAGE DEBUG:", clean['cd_logo'], "→", logo);
           // Base URL for GitHub Pages
-          const baseUrl = "https://montanaconservationdistricts.github.io/cd_map-new/";
+const baseUrl = "https://montanaconservationdistricts.github.io/cd_map-new/";
 
-          // If it's a relative path, prepend base URL
-          if (logo && !logo.startsWith('http')) {
-            logo = baseUrl + logo.replace(/^\/+/, '');
-          }
+if (logo && !logo.startsWith('http')) {
+  logo = baseUrl + logo.replace(/^\/+/, '');
+}
 
           // =========================
           // Build popup

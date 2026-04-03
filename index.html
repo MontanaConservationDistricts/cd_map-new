@@ -13,6 +13,7 @@
 html, body { height:100%; margin:0; }
 #map { height:100%; }
 .popup-content { font-size:13px; max-width:260px; }
+.popup-content img { max-width:120px; height:auto; display:block; margin-bottom:5px; }
 </style>
 </head>
 
@@ -31,21 +32,21 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 // =========================
-// Optional: GeoJSON layer (if you have a background boundary)
+// GeoJSON (optional)
 // =========================
-const geojsonUrl = './data/district-boundaries_simplified-disable.geojson'; // adjust path
-fetch(geojsonUrl)
+fetch('./data/district-boundaries_simplified-disable.geojson')
   .then(res => res.json())
   .then(data => {
     L.geoJSON(data, {
       style: { color: '#2a9d8f', weight: 2, fillOpacity: 0.1 }
     }).addTo(map);
-  });
+  })
+  .catch(() => console.log("GeoJSON not loaded (optional)"));
 
 // =========================
 // CSV markers
 // =========================
-const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?gid=203628658&single=true&output=csv";
+const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQOhw-AhzNOE7w-1Fc82Lxew_OVewMp-wz3aMLF137YZWDegmqtMh1QtrExCVyjl2_73LNTzqSVRG_Y/pub?gid=203628658&single=true&output=csv&t=" + Date.now();
 
 fetch(csvUrl)
   .then(r => r.text())
@@ -54,7 +55,13 @@ fetch(csvUrl)
     Papa.parse(csv, {
       header: true,
       skipEmptyLines: true,
-      transform: value => value ? value.trim() : '', // remove extra spaces
+
+      // CLEAN ALL VALUES (fixes quotes + spaces)
+      transform: value => {
+        if (!value) return '';
+        return value.trim().replace(/^"+|"+$/g, '');
+      },
+
       complete: (results) => {
 
         const data = results.data;
@@ -67,32 +74,61 @@ fetch(csvUrl)
           // Normalize keys
           const clean = {};
           Object.keys(row).forEach(k => {
-            if(k) clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
+            if (k) clean[k.trim().toLowerCase()] = row[k] ? row[k].trim() : '';
           });
 
-// Parse lat/lng safely
-let lat = clean['lat'] ? clean['lat'].replace(',', '').trim() : '';
-let lng = clean['long'] ? clean['long'].replace(',', '').trim() : '';
+          // =========================
+          // Parse lat/lng
+          // =========================
+          let lat = clean['lat']?.replace(',', '') || '';
+          let lng = clean['long']?.replace(',', '') || '';
 
-lat = parseFloat(lat);
-lng = parseFloat(lng);
+          lat = parseFloat(lat);
+          lng = parseFloat(lng);
 
-if (isNaN(lat) || isNaN(lng)) return; // skip invalid
+          if (isNaN(lat) || isNaN(lng)) return;
 
-          // Build popup from the CSV row
-          const html = `<div class="popup-content">
-            <b>${clean['name'] || ''}</b><br>
-            ${clean['cd_logo'] ? `<img src="${clean['cd_logo']}" alt="${clean['name']}" style="max-width:100px;"><br>` : ''}
-            ${clean['physical_address'] || ''}<br>
-            ${clean['city'] || ''}, ${clean['state'] || ''} ${clean['zip'] || ''}<br>
-            ${clean['hours'] || ''}<br>
-            ${clean['phone'] || ''}<br>
-            ${clean['email'] ? `<a href="mailto:${clean['email']}">${clean['email']}</a>` : ''}<br>
-            ${clean['website'] ? `<a href="${clean['website']}" target="_blank">${clean['website']}</a>` : ''}<br>
-            ${clean['social_media'] || ''}
-          </div>`;
+          // =========================
+          // FIX IMAGE URL
+          // =========================
+          let logo = clean['cd_logo'] || '';
 
-          // Add marker tied to this row's lat/lng
+          // Convert Google Drive links automatically
+          const match = logo.match(/\/d\/(.*?)\//);
+          if (match) {
+            logo = `https://drive.google.com/uc?export=view&id=${match[1]}`;
+          }
+
+          // Final cleanup
+          if (!logo.startsWith('http')) logo = '';
+
+          // =========================
+          // Build popup
+          // =========================
+          const html = `
+            <div class="popup-content">
+              <b>${clean['name'] || ''}</b><br>
+
+              ${logo ? `
+                <img src="${logo}" 
+                     onerror="console.log('BROKEN IMAGE:', this.src); this.style.display='none';">
+              ` : ''}
+
+              ${clean['physical_address'] || ''}<br>
+              ${clean['city'] || ''}, ${clean['state'] || ''} ${clean['zip'] || ''}<br>
+              ${clean['hours'] || ''}<br>
+              ${clean['phone'] || ''}<br>
+
+              ${clean['email'] ? `<a href="mailto:${clean['email']}">${clean['email']}</a><br>` : ''}
+              ${clean['website'] ? `<a href="${clean['website']}" target="_blank">Website</a><br>` : ''}
+
+              ${clean['social_media'] || ''}
+            </div>
+          `;
+
+          // =========================
+          // Add marker
+          // =========================
           L.marker([lat, lng])
             .bindPopup(html)
             .addTo(map);
@@ -102,7 +138,8 @@ if (isNaN(lat) || isNaN(lng)) return; // skip invalid
       }
     });
 
-  });
+  })
+  .catch(err => console.error("CSV LOAD ERROR:", err));
 </script>
 </body>
 </html>
